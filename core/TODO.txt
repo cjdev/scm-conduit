@@ -1,2 +1,7 @@
-make sure cases like so are handled well:
-    bzr mv dir subdir/newdirname
+Add a UI for:
+  * Listing existing conduits
+  * Adding new conduits
+  * Inspecting the status of an existing conduit (lag, etc)
+  * Adding a new user
+Add full/true/good multi-user support
+Add git support
