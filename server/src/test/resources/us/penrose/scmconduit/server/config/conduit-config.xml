@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<scm-conduit>
+	<id>d0fbe158-0135-4e77-ad01-c4692a0d8117</id>
+	<name>foo-trunk</name>
+	<peer xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		xsi:type="perforcePeer">
+		<host>p4.mycorp.com</host>
+		<port>1423</port>
+		<path>//foo/trunk</path>
+	</peer>
+	<publishMethod>BZR_DEFAULT</publishMethod>
+</scm-conduit>

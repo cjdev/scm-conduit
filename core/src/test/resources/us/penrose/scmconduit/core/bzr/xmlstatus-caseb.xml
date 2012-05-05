@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<status workingtree_root="/home/joe/projects/scm-conduit/temp/">
+	<renamed>
+		<file oldpath="x.txt" fid="x.txt-20101006043118-og6c16ckbcw9vf9e-1">xx.txt</file>
+	</renamed>
+	<pending_merges>
+		<log>
+			<revisionid>joe@martin-20101006053641-axc43op2hct4uz93</revisionid>
+			<committer>joe &lt;joe@martin&gt;</committer>
+			<timestamp>Tue 2010-10-05 22:36:41 -0700</timestamp>
+			<message><![CDATA[
+* Made a move]]></message>
+		</log>
+	</pending_merges>
+</status>

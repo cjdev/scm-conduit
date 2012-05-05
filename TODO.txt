@@ -1,0 +1,5 @@
+[scm-conduit] make it easy to consume shelved changes
+[scm-conduit] make it easy to share changes as a shelve
+[scm-conduit] fix the issue where you have to merge with your own changes after a submit
+[scm-conduit] make it easy to make a new conduit from a given p4 depot path
+[scm-conduit] make it easy to make a 'branch' conduit that mirrors a p4 branch

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<status workingtree_root="/home/joe/projects/scm-conduit/temp/">
+
+	<removed>
+		<file fid="test.java-20101006032333-grucv0mxa24lkbhu-1">Test.java</file>
+	</removed>
+	<renamed>
+		<file oldpath="x.txt" fid="x.txt-20101006043118-og6c16ckbcw9vf9e-1">xx.txt</file>
+	</renamed>
+	<added>
+		<file fid="mover.txt-20101006043018-nmdedkv976uyj8fl-1">myfirstdir/there.txt</file>
+		<file fid="x.txt-20101006043118-og6c16ckbcw9vf9e-1">x.txt</file>
+		<file fid="y.txt-20101006043118-og6c16ckbcw9vf9e-2">y.txt</file>
+		<file fid="z.txt-20101006043118-og6c16ckbcw9vf9e-3">z.txt</file>
+	</added>
+	<pending_merges>
+		<log>
+			<revisionid>joe@martin-20101006043206-x64n76i6xplapljz</revisionid>
+			<committer>joe &lt;joe@martin&gt;</committer>
+			<timestamp>Tue 2010-10-05 21:32:06 -0700</timestamp>
+			<message><![CDATA[
+* Added all sorts of things]]></message>
+		</log>
+		<log>
+			<revisionid>joe@martin-20101006043039-mof7ad5fsmz586rb</revisionid>
+			<committer>joe &lt;joe@martin&gt;</committer>
+			<timestamp>Tue 2010-10-05 21:30:39 -0700</timestamp>
+			<message><![CDATA[
+* First move]]></message>
+		</log>
+		<log>
+			<revisionid>joe@martin-20101006043025-ejkjqjrxjvd45pta</revisionid>
+			<committer>joe &lt;joe@martin&gt;</committer>
+			<timestamp>Tue 2010-10-05 21:30:25 -0700</timestamp>
+			<message><![CDATA[
+* Added the mover]]></message>
+		</log>
+		<log>
+			<revisionid>joe@martin-20101006035313-3aegstnehgbfilr2</revisionid>
+			<committer>joe &lt;joe@martin&gt;</committer>
+			<timestamp>Tue 2010-10-05 20:53:13 -0700</timestamp>
+			<message><![CDATA[
+* Added howdy-doody time]]></message>
+		</log>
+	</pending_merges>
+</status>

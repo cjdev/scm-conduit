@@ -1,0 +1,2 @@
+make sure cases like so are handled well:
+    bzr mv dir subdir/newdirname
