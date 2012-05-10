@@ -2,12 +2,12 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
-		<groupId>org.cjdev.scmconduit</groupId>
+		<groupId>com.cj.scmconduit</groupId>
 		<artifactId>scm-conduit-pom</artifactId>
 		<version>0.0.1-SNAPSHOT</version>
 	</parent>
 
-	<groupId>org.cjdev.scmconduit.server</groupId>
+	<groupId>com.cj.scmconduit.server</groupId>
 	<artifactId>scm-conduit-server</artifactId>
 
 	<name>${project.artifactId}</name>
@@ -32,7 +32,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>org.cjdev.scmconduit.server.ConduitServerMain</mainClass>
+                            <mainClass>com.cj.scmconduit.server.ConduitServerMain</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -111,7 +111,7 @@
 			<version>140</version>
 		</dependency>
 		<dependency>
-			<groupId>org.cjdev.scmconduit.core</groupId>
+			<groupId>com.cj.scmconduit.core</groupId>
 			<artifactId>scm-conduit-core</artifactId>
 			<version>${project.version}</version>
 		</dependency>

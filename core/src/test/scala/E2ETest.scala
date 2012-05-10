@@ -1,10 +1,10 @@
 import java.io.{File => LocalPath, IOException, ByteArrayInputStream}
-import us.penrose.scmconduit.core.util.CommandRunner
-import us.penrose.scmconduit.core.util.CommandRunnerImpl
+import com.cj.scmconduit.core.util.CommandRunner
+import com.cj.scmconduit.core.util.CommandRunnerImpl
 import scala.xml._
-import us.penrose.scmconduit.core.p4._
-import us.penrose.scmconduit.core.bzr._
-import us.penrose.scmconduit.core.ScmConduit
+import com.cj.scmconduit.core.p4._
+import com.cj.scmconduit.core.bzr._
+import com.cj.scmconduit.core.ScmConduit
 import org.junit.Test
 import RichFile._
 import org.junit.Assert._
