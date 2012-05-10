@@ -66,7 +66,7 @@ public class ScmConduit {
 				conduit.rollback();
 				break;
 			case COMMIT:
-				conduit.commit();
+				conduit.commit(credentials);
 				break;
 			case P42BZR:
 				conduit.p42bzr();
@@ -232,14 +232,16 @@ public class ScmConduit {
 		return new File(conduitPath, TEMP_FILE_NAME);
 	}
 
-	public void commit() throws Exception {
+	public void commit(P4Credentials using) throws Exception {
 
 		File tempFile = tempFile(); 
 		if(!tempFile.exists())
 			throw new RuntimeException("Cannot find" + tempFile.getAbsolutePath());
 
 		Long p4ChangelistId = new Long(FileUtils.readFileToString(tempFile));
-
+		
+		P4 p4 = p4ForUser(using);
+		
 		p4.doCommand("submit", "-c", p4ChangelistId.toString());
 		runBzr("commit", "-m", "Pushed to p4 as changelist " + p4ChangelistId);
 
@@ -248,6 +250,19 @@ public class ScmConduit {
 
 
 		assertNoBzrChanges();
+	}
+
+
+	private P4 p4ForUser(P4Credentials using) {
+		ConduitState state = readState();
+		
+		P4 p4 = new P4(
+				new P4DepotAddress(state.p4Port), 
+				new P4ClientId(state.p4ClientId),
+				using.user,
+				conduitPath, 
+				shell);
+		return p4;
 	}
 	
 	public void shelveADiff(String changelistDescription, File pathToDiff) throws Exception {
@@ -289,7 +304,7 @@ public class ScmConduit {
 
 	private void assertNoBzrChanges(){
 		BzrStatus s = BzrStatus.read(runBzr("xmlstatus"));
-
+ 
 		if(!s.isUnchanged()){
 			throw new RuntimeException("I was expecting there to be no local bzr changes, but I found some.");
 		}
@@ -309,7 +324,8 @@ public class ScmConduit {
 			System.out.println("There are no new changes");
 			return false;
 		}else{
-			final Integer changeListNum = createP4ChangelistFromBzrStatus(s);
+			final P4 p4 = p4ForUser(using);
+			final Integer changeListNum = createP4ChangelistFromBzrStatus(s, p4);
 
 			writeTempFile(changeListNum);
 			
@@ -318,12 +334,12 @@ public class ScmConduit {
 	}
 
 
-	private Integer createP4ChangelistFromBzrStatus(final BzrStatus s) {
+	private Integer createP4ChangelistFromBzrStatus(final BzrStatus s, final P4 p4) {
 		final String message = createP4MessageFromBzrStatus(s);
 		
-		final Integer changeListNum = createP4ChangelistWithMessage(message);
+		final Integer changeListNum = createP4ChangelistWithMessage(message, p4);
 
-		translateBzrStatusToP4Changelist(s, changeListNum);
+		translateBzrStatusToP4Changelist(s, changeListNum, p4);
 		return changeListNum;
 	}
 
@@ -339,19 +355,19 @@ public class ScmConduit {
 	}
 
 
-	private Integer createP4ChangelistWithMessage(final String message) {
+	private Integer createP4ChangelistWithMessage(final String message,  final P4 p4) {
 		System.out.println("Changes:\n" + message);
 
 		System.out.println("Creating changelist");
 
 		final String changelistText = p4.doCommand("changelist", "-o").replaceAll(Pattern.quote("<enter description here>"), message);
 
-		final Integer changeListNum = createChangelist(changelistText);
+		final Integer changeListNum = createChangelist(changelistText, p4);
 		return changeListNum;
 	}
 
 
-	private void translateBzrStatusToP4Changelist(BzrStatus s, final Integer changeListNum) {
+	private void translateBzrStatusToP4Changelist(BzrStatus s, final Integer changeListNum,  final P4 p4) {
 		System.out.println("Processing changes");
 		final Set<String> filesMoved = new HashSet<String>();
 
@@ -421,7 +437,7 @@ public class ScmConduit {
 	}
 
 
-	private Integer createChangelist(final String changelistText) {
+	private Integer createChangelist(final String changelistText,  final P4 p4) {
 		final Integer changeListNum;
 		
 		final String output = p4.doCommand(new ByteArrayInputStream(changelistText.getBytes()), "changelist", "-i");

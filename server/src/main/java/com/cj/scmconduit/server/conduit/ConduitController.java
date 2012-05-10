@@ -117,12 +117,13 @@ public class ConduitController implements Pusher {
 
 	private void handle(PushRequest request) {
 		try {
+			final P4Credentials credentials = request.credentials;
 			String source = request.location.getAbsolutePath();
 			log.info("Pulling from " + source);
-			boolean changesWerePulled = conduit.pull(source, request.credentials);
+			boolean changesWerePulled = conduit.pull(source, credentials);
 			if(changesWerePulled){
 				log.info("Committing");
-				conduit.commit();
+				conduit.commit(credentials);
 				request.listener.pushSucceeded();
 			}else{
 				request.listener.nothingToPush();

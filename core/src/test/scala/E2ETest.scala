@@ -125,8 +125,9 @@ class E2ETest {
 			val haveBefore = p4(spec, shell).doCommand("have")
 			
 			// when: the change is submitted to the conduit
-			val changesFlowed = conduit.pull(branch, new P4Credentials("larry", ""))
-			conduit.commit();
+			val credentials = new P4Credentials("larry", "")
+			val changesFlowed = conduit.pull(branch, credentials)
+			conduit.commit(credentials);
 			
 			// then: 
 			//   1) The changes make their way through to perforce
