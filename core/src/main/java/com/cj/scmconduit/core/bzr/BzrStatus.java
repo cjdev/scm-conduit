@@ -2,6 +2,7 @@ package com.cj.scmconduit.core.bzr;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -61,5 +62,17 @@ public class BzrStatus {
 			(pendingMerges.size()==0)
 			&&
 			(unknown.size()==0);
+	}
+	
+	@Override
+	public String toString() {
+		try{
+			JAXBContext c = JAXBContext.newInstance(BzrStatus.class);
+			StringWriter text = new StringWriter();
+			c.createMarshaller().marshal(this, text);
+			return text.toString();
+		}catch (Exception e){
+			throw new RuntimeException(e);
+		}
 	}
 }

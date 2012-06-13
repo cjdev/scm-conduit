@@ -33,7 +33,7 @@ import com.cj.scmconduit.core.p4.P4Time;
 import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.core.util.CommandRunnerImpl;
 
-public class ScmConduit {
+public class BzrP4Conduit {
 	private static final String TEMP_FILE_NAME=".scm-conduit-temp";
 	private static final String META_FILE_NAME=".scm-conduit";
 
@@ -53,7 +53,7 @@ public class ScmConduit {
 
 			File cwd = new File(System.getProperty("user.dir"));
 
-			ScmConduit conduit = new ScmConduit(cwd, shell);
+			BzrP4Conduit conduit = new BzrP4Conduit(cwd, shell);
 			P4Credentials credentials = new P4Credentials(System.getProperty("user.name"), "");
 			 
 			Mode mode = Mode.valueOf(args[0].toUpperCase());
@@ -89,7 +89,7 @@ public class ScmConduit {
 	private final P4 p4;
 	private final CommandRunner shell;
 
-	public ScmConduit(File conduitPath, CommandRunner shell) {
+	public BzrP4Conduit(File conduitPath, CommandRunner shell) {
 		super();
 		this.conduitPath = conduitPath;
 		this.shell = shell;
@@ -306,7 +306,7 @@ public class ScmConduit {
 		BzrStatus s = BzrStatus.read(runBzr("xmlstatus"));
  
 		if(!s.isUnchanged()){
-			throw new RuntimeException("I was expecting there to be no local bzr changes, but I found some.");
+			throw new RuntimeException("I was expecting there to be no local bzr changes, but I found some.\n" + s.toString());
 		}
 	}
 
