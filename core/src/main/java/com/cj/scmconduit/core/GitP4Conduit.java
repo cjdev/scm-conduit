@@ -1,7 +1,6 @@
 package com.cj.scmconduit.core;
 
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -22,8 +21,9 @@ import com.cj.scmconduit.core.bzr.BzrFile;
 import com.cj.scmconduit.core.bzr.BzrStatus;
 import com.cj.scmconduit.core.bzr.LogEntry;
 import com.cj.scmconduit.core.git.GitFileStatus;
+import com.cj.scmconduit.core.git.GitRevisionInfo;
 import com.cj.scmconduit.core.git.GitStatus;
-import com.cj.scmconduit.core.p4.P4;
+import com.cj.scmconduit.core.p4.P4Impl;
 import com.cj.scmconduit.core.p4.P4Changelist;
 import com.cj.scmconduit.core.p4.P4ClientId;
 import com.cj.scmconduit.core.p4.P4Credentials;
@@ -43,7 +43,7 @@ public class GitP4Conduit {
 
 
 	private final File conduitPath;
-	private final P4 p4;
+	private final P4Impl p4;
 	private final CommandRunner shell;
 
 	public GitP4Conduit(File conduitPath, CommandRunner shell) {
@@ -53,7 +53,7 @@ public class GitP4Conduit {
 		
 		ConduitState state = readState();
 		
-		this.p4 = new P4(
+		this.p4 = new P4Impl(
 				new P4DepotAddress(state.p4Port), 
 				new P4ClientId(state.p4ClientId),
 				state.p4ReadUser,
@@ -271,9 +271,7 @@ public class GitP4Conduit {
 			throw new RuntimeException("I was expecting there to be no local git changes, but I found some:\n" + status);
 		}
 	}
-	private enum GitOp {
-		A
-	}
+	
 	public boolean pull(String source, P4Credentials using){
 		try{
 			String currentRev = runGit("log", "-1", "--format=%H").trim();
@@ -284,7 +282,6 @@ public class GitP4Conduit {
 			runGit("checkout", "incoming");
 			final String missing = runGit("cherry", "master");
 			runGit("checkout", "master");
-//			runGit("remote", "rm", "temp");
 			System.out.println("Missing is " + missing);
 			if(missing.isEmpty()){
 				return false;
@@ -295,26 +292,12 @@ public class GitP4Conduit {
 					String rev = line.replaceAll(Pattern.quote("+"), "").trim();
 					runGit("merge", "incoming", rev);
 					String log = runGit("log", "--name-status", currentRev + ".." + rev);
-					log = stripStuff(log);
-					System.out.println("Log is " + log);
+					System.out.println(log);
 					
-					final Integer changeListNum = createP4ChangelistWithMessage("revision " + rev, p4);
-					for(String changeLine : (List<String>) IOUtils.readLines(new StringReader(log))){ 
-						GitOp gitOp = GitOp.valueOf(changeLine.substring(0, 1));
-						String file = changeLine.substring(2);
-						System.out.println("  NEXT: " + changeLine);
-						System.out.println("   CHANGE: " + gitOp);
-						System.out.println("     FILE: " + file);
-//						changeLine.charAt(0)
-						
-						switch(gitOp){
-						case A: {
-							p4.doCommand("add", "-c", changeListNum.toString(), file);
-							break;
-						}
-						default: throw new RuntimeException("I don't know how to handle " + gitOp);
-						}
-					}
+					GitRevisionInfo changes = new GitRevisionInfo(log);
+					
+					final Integer changeListNum = new Translator(p4).translate(changes); 
+					
 					p4.doCommand("submit", "-c", changeListNum.toString());
 				}
 				
@@ -367,23 +350,6 @@ public class GitP4Conduit {
 //		return changeListNum;
 //	}
 
-	private String stripStuff(String log) {
-		try{
-			StringBuilder text = new StringBuilder();
-			BufferedReader r = new BufferedReader(new StringReader(log));
-			for(String line = r.readLine(); line!=null; line = r.readLine()){
-				if(line.startsWith("commit ") || line.startsWith("Author") || line.startsWith("Date:") || line.trim().isEmpty() || line.startsWith("    ")){
-					// do nothing
-				}else{
-					text.append(line);
-					text.append("\n");
-				}
-			}
-			return text.toString();
-		}catch(Exception e){
-			throw new RuntimeException(e);
-		}
-	}
 
 
 	private void writeTempFile(final Integer changeListNum) {
@@ -397,69 +363,58 @@ public class GitP4Conduit {
 	}
 
 
-	private Integer createP4ChangelistWithMessage(final String message,  final P4 p4) {
-		System.out.println("Changes:\n" + message);
 
-		System.out.println("Creating changelist");
-
-		final String changelistText = p4.doCommand("changelist", "-o").replaceAll(Pattern.quote("<enter description here>"), message);
-
-		final Integer changeListNum = createChangelist(changelistText, p4);
-		return changeListNum;
-	}
-
-
-	private void translateBzrStatusToP4Changelist(BzrStatus s, final Integer changeListNum,  final P4 p4) {
-		System.out.println("Processing changes");
-		final Set<String> filesMoved = new HashSet<String>();
-
-		if(s.renames.numDirectories()>0){
-			// TODO: Add a check here to make sure we're 'synced' with perforce?
-			//   the reason is that you might be moving a directory into which someone else has places something
-			//   since your last sync, and you probably want that to move as well.
-			// REALLY, SUCH A CHECK SHOULD PROBABLY BE MANDATORY REGARDLESS
-			for(BzrFile next : s.renames.directories){
-				System.out.println("[MOV DIR] " + next.oldPath + " --> " +  next.file);
-				File pathOnDisk = new File(conduitPath, next.file);
-				if(pathOnDisk.isDirectory()){
-					recursiveMove(pathOnDisk, next.oldPath, next.file, changeListNum, filesMoved);
-				}else {
-					throw new RuntimeException("This shouldn't be a file.  Something has happened that I don't understand.");
-				}
-			}
-		}
-
-		System.out.println(s.renames.numFiles() + " file renames");
-		for(BzrFile next : s.renames.files){
-			System.out.println("[MOV] " + next.oldPath + " --> " +  next.file);
-			if(!new File(next.file).isDirectory()){
-				p4.doCommand("edit", "-c", changeListNum.toString(), "-k", next.oldPath);
-				p4.doCommand("move", "-c", changeListNum.toString(), "-k", next.oldPath, next.file);
-				filesMoved.add(next.file);
-			}else{
-				throw new RuntimeException("This shouldn't be a directory.  Something has happened that I don't understand.");
-			}
-		}
-
-		for(BzrFile next : s.additions.files){
-			System.out.println("[ADD] " + next.file);
-			p4.doCommand("add", "-c", changeListNum.toString(), next.file);
-		}
-		for(BzrFile next : s.deletions.files){
-			System.out.println("[DEL] " + next.file);
-			p4.doCommand("delete", "-c", changeListNum.toString(), next.file);
-		}
-
-		for(BzrFile next : s.modifications.files){
-			System.out.println("[MOD] " + next.file);
-			if(filesMoved.contains(next.file)){
-				// NO NEED TO DO ANYTHING ... WE'VE ALREADY OPENED THIS FILE FOR EDITS
-			}else{
-				p4.doCommand("edit", "-c", changeListNum.toString(), next.file);
-			}
-		}
-		System.out.println("Your bzr changes have been saved to " + changeListNum);
-	}
+//	private void translateBzrStatusToP4Changelist(BzrStatus s, final Integer changeListNum,  final P4 p4) {
+//		System.out.println("Processing changes");
+//		final Set<String> filesMoved = new HashSet<String>();
+//
+//		if(s.renames.numDirectories()>0){
+//			// TODO: Add a check here to make sure we're 'synced' with perforce?
+//			//   the reason is that you might be moving a directory into which someone else has places something
+//			//   since your last sync, and you probably want that to move as well.
+//			// REALLY, SUCH A CHECK SHOULD PROBABLY BE MANDATORY REGARDLESS
+//			for(BzrFile next : s.renames.directories){
+//				System.out.println("[MOV DIR] " + next.oldPath + " --> " +  next.file);
+//				File pathOnDisk = new File(conduitPath, next.file);
+//				if(pathOnDisk.isDirectory()){
+//					recursiveMove(pathOnDisk, next.oldPath, next.file, changeListNum, filesMoved);
+//				}else {
+//					throw new RuntimeException("This shouldn't be a file.  Something has happened that I don't understand.");
+//				}
+//			}
+//		}
+//
+//		System.out.println(s.renames.numFiles() + " file renames");
+//		for(BzrFile next : s.renames.files){
+//			System.out.println("[MOV] " + next.oldPath + " --> " +  next.file);
+//			if(!new File(next.file).isDirectory()){
+//				p4.doCommand("edit", "-c", changeListNum.toString(), "-k", next.oldPath);
+//				p4.doCommand("move", "-c", changeListNum.toString(), "-k", next.oldPath, next.file);
+//				filesMoved.add(next.file);
+//			}else{
+//				throw new RuntimeException("This shouldn't be a directory.  Something has happened that I don't understand.");
+//			}
+//		}
+//
+//		for(BzrFile next : s.additions.files){
+//			System.out.println("[ADD] " + next.file);
+//			p4.doCommand("add", "-c", changeListNum.toString(), next.file);
+//		}
+//		for(BzrFile next : s.deletions.files){
+//			System.out.println("[DEL] " + next.file);
+//			p4.doCommand("delete", "-c", changeListNum.toString(), next.file);
+//		}
+//
+//		for(BzrFile next : s.modifications.files){
+//			System.out.println("[MOD] " + next.file);
+//			if(filesMoved.contains(next.file)){
+//				// NO NEED TO DO ANYTHING ... WE'VE ALREADY OPENED THIS FILE FOR EDITS
+//			}else{
+//				p4.doCommand("edit", "-c", changeListNum.toString(), next.file);
+//			}
+//		}
+//		System.out.println("Your bzr changes have been saved to " + changeListNum);
+//	}
 
 
 //	private String createP4MessageFromBzrStatus(BzrStatus s) {
@@ -479,26 +434,6 @@ public class GitP4Conduit {
 //	}
 
 
-	private Integer createChangelist(final String changelistText,  final P4 p4) {
-		final Integer changeListNum;
-		
-		final String output = p4.doCommand(new ByteArrayInputStream(changelistText.getBytes()), "changelist", "-i");
-		System.out.println(output);
-
-		try {
-			String txt = output
-			.replaceAll(("created."), "")
-			.replaceAll(("Change"), "")
-			.trim();
-			System.out.println("Txt: " + txt);
-			changeListNum = Integer.parseInt(txt);
-			System.out.println("Found number " + changeListNum);
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new RuntimeException(e);
-		}
-		return changeListNum;
-	}
 
 
 	private void recursiveMove(File currentOnDiskLocation, String oldRelPath, String newRelPath, Integer changeListNum, Set<String> filesMoved){

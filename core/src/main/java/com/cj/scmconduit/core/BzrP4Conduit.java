@@ -20,6 +20,7 @@ import com.cj.scmconduit.core.bzr.BzrFile;
 import com.cj.scmconduit.core.bzr.BzrStatus;
 import com.cj.scmconduit.core.bzr.LogEntry;
 import com.cj.scmconduit.core.p4.P4;
+import com.cj.scmconduit.core.p4.P4Impl;
 import com.cj.scmconduit.core.p4.P4Changelist;
 import com.cj.scmconduit.core.p4.P4ClientId;
 import com.cj.scmconduit.core.p4.P4Credentials;
@@ -86,7 +87,7 @@ public class BzrP4Conduit {
 	}
 
 	private final File conduitPath;
-	private final P4 p4;
+	private final P4Impl p4;
 	private final CommandRunner shell;
 
 	public BzrP4Conduit(File conduitPath, CommandRunner shell) {
@@ -96,7 +97,7 @@ public class BzrP4Conduit {
 		
 		ConduitState state = readState();
 		
-		this.p4 = new P4(
+		this.p4 = new P4Impl(
 				new P4DepotAddress(state.p4Port), 
 				new P4ClientId(state.p4ClientId),
 				state.p4ReadUser,
@@ -253,10 +254,10 @@ public class BzrP4Conduit {
 	}
 
 
-	private P4 p4ForUser(P4Credentials using) {
+	private P4Impl p4ForUser(P4Credentials using) {
 		ConduitState state = readState();
 		
-		P4 p4 = new P4(
+		P4Impl p4 = new P4Impl(
 				new P4DepotAddress(state.p4Port), 
 				new P4ClientId(state.p4ClientId),
 				using.user,
@@ -324,7 +325,7 @@ public class BzrP4Conduit {
 			System.out.println("There are no new changes");
 			return false;
 		}else{
-			final P4 p4 = p4ForUser(using);
+			final P4Impl p4 = p4ForUser(using);
 			final Integer changeListNum = createP4ChangelistFromBzrStatus(s, p4);
 
 			writeTempFile(changeListNum);
@@ -334,7 +335,7 @@ public class BzrP4Conduit {
 	}
 
 
-	private Integer createP4ChangelistFromBzrStatus(final BzrStatus s, final P4 p4) {
+	private Integer createP4ChangelistFromBzrStatus(final BzrStatus s, final P4Impl p4) {
 		final String message = createP4MessageFromBzrStatus(s);
 		
 		final Integer changeListNum = createP4ChangelistWithMessage(message, p4);
@@ -355,7 +356,7 @@ public class BzrP4Conduit {
 	}
 
 
-	private Integer createP4ChangelistWithMessage(final String message,  final P4 p4) {
+	private Integer createP4ChangelistWithMessage(final String message,  final P4Impl p4) {
 		System.out.println("Changes:\n" + message);
 
 		System.out.println("Creating changelist");
@@ -437,7 +438,7 @@ public class BzrP4Conduit {
 	}
 
 
-	private Integer createChangelist(final String changelistText,  final P4 p4) {
+	private Integer createChangelist(final String changelistText,  final P4Impl p4) {
 		final Integer changeListNum;
 		
 		final String output = p4.doCommand(new ByteArrayInputStream(changelistText.getBytes()), "changelist", "-i");

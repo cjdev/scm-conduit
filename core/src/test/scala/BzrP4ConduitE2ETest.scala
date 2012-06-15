@@ -79,7 +79,7 @@ class BzrP4ConduitE2ETest {
 		p
 	}
 	
-	def p4(spec:ClientSpec, shell:CommandRunner)= new P4(new P4DepotAddress("localhost:1666"), new P4ClientId(spec.clientId), spec.owner, spec.localPath, shell);
+	def p4(spec:ClientSpec, shell:CommandRunner)= new P4Impl(new P4DepotAddress("localhost:1666"), new P4ClientId(spec.clientId), spec.owner, spec.localPath, shell);
 	
 	def createConduit(spec:ClientSpec, shell:CommandRunner) = {
 			println(spec)
@@ -117,11 +117,11 @@ class BzrP4ConduitE2ETest {
 		  	
 			// GIVEN: A new conduit connected to a depot with an empty history, and a bzr branch with one change
 			val branch = tempPath()
-			shell.run("git", "clone",  spec.localPath, branch)
+			shell.run("bzr", "clone",  spec.localPath, branch)
 			val newFile = branch / "file.txt"
 			newFile.write("hello world")
-			shell.run("git", "add", "-D", branch)
-			shell.run("git", "commit", "-m", "Added_file.txt", "-D", branch)
+			shell.run("bzr", "add", "-D", branch)
+			shell.run("bzr", "commit", "-m", "Added_file.txt", "-D", branch)
 			
 			val haveBefore = p4(spec, shell).doCommand("have")
 			
