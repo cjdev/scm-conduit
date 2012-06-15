@@ -13,7 +13,40 @@ import org.apache.commons.io.IOUtils
 
 class TranslatorTest {
 
-  
+  @Test
+  def translatesEdits(){
+    // GIVEN
+    val commandsIssued = new scala.collection.mutable.ListBuffer[List[String]]()
+    val p4:P4 = new P4Stub(){
+      
+	  override def doCommand(in:InputStream, args:String*) = args.toList match {
+		    case List("changelist", "-i")  => "Change 21 created."
+	  }
+      
+	  override def doCommand(parts:String*) = parts.toList match {
+	    case List("changelist", "-o") => "<enter description here>"
+	    case _ => commandsIssued.+=(parts.toList);"<enter description here>"
+	  }
+	}
+    val t = new Translator(p4) 
+    
+    val changes = new GitRevisionInfo(
+			"jerry lee lewis",
+			"2012-03-02 23:00 PDT",
+			"xyz123",
+			"I am legend",
+			new Change(ChangeType.M, "test.txt")
+    )
+    
+    // WHEN
+    t.translate(changes)
+    
+    // THEN
+    println(commandsIssued)
+    assertEquals(1, commandsIssued.size)
+    assertTrue(commandsIssued.contains(List("edit", "-c", "21", "test.txt")))
+  }
+    
   @Test
   def translatesAdds(){
     // GIVEN
@@ -100,7 +133,7 @@ class TranslatorTest {
 	}
     val t = new Translator(p4) 
     
-    val change = new Change(ChangeType.M, "test.txt", "file.txt")
+    val change = new Change(ChangeType.R, "test.txt", "file.txt")
     
     val changes = new GitRevisionInfo(
 			"jerry lee lewis",

@@ -34,7 +34,7 @@ import com.cj.scmconduit.core.p4.P4Time;
 import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.core.util.CommandRunnerImpl;
 
-public class BzrP4Conduit {
+public class BzrP4Conduit implements Conduit {
 	private static final String TEMP_FILE_NAME=".scm-conduit-temp";
 	private static final String META_FILE_NAME=".scm-conduit";
 
@@ -70,7 +70,7 @@ public class BzrP4Conduit {
 				conduit.commit(credentials);
 				break;
 			case P42BZR:
-				conduit.p42bzr();
+				conduit.push();
 				break;
 			case SHELVE:
 				conduit.shelveADiff(args[1], new File(args[2]));
@@ -105,9 +105,9 @@ public class BzrP4Conduit {
 				shell
 		);
 	}
-
-
-	public void p42bzr() throws Exception {
+	
+	@Override
+	public void push() throws Exception { 
 		final int p4TimeZoneOffset = findP4TimeZoneOffset();
 
 		boolean keepPumping = true;
@@ -216,6 +216,7 @@ public class BzrP4Conduit {
 		return state.lastSyncedP4Changelist;
 	}
 
+	@Override
 	public void rollback() throws Exception {
 		//		BzrStatus s = BzrStatus.read(runBzr("xmlstatus"));
 		p4.doCommand("revert", "//...");
@@ -311,6 +312,7 @@ public class BzrP4Conduit {
 		}
 	}
 
+	@Override
 	public boolean pull(String source, P4Credentials using){
 
 		if(!BzrStatus.read(runBzr("xmlstatus")).isUnchanged()){

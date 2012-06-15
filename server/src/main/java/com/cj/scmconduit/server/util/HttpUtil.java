@@ -7,7 +7,7 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.apache.commons.codec.binary.Base64;
 
-import com.cj.scmconduit.core.p4.P4Credentials;
+import com.cj.scmconduit.core.p4.P4Credentials;;
 
 public class HttpUtil {
 

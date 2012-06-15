@@ -28,6 +28,10 @@ public class Translator {
 				break;
 			}
 			case M: {
+				p4.doCommand("edit", "-c", changeListNum.toString(), change.path);
+				break;
+			}
+			case R: {
 				p4.doCommand("edit", "-c", changeListNum.toString(), "-k", change.path);
 				p4.doCommand("move", "-c", changeListNum.toString(), "-k", change.path, change.destPath);
 				break;
