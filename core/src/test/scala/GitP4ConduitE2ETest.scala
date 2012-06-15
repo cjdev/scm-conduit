@@ -3,16 +3,101 @@ import com.cj.scmconduit.core.util.CommandRunner
 import com.cj.scmconduit.core.util.CommandRunnerImpl
 import scala.xml._
 import com.cj.scmconduit.core.p4._
-import com.cj.scmconduit.core.bzr._
 import com.cj.scmconduit.core.GitP4Conduit
-import org.junit.Test
+import org.junit.{
+  Test, Before
+}
 import RichFile._
 import org.junit.Assert._
 
-class BzrP4ConduitE2ETest {
+class GitP4ConduitE2ETest {
   
+  @Before
+  def safetyCheck(){
+    
+    var dir = new LocalPath(System.getProperty("user.dir"))
+    
+    while(dir!=null){
+        var path = new LocalPath(dir, ".git")
+    	System.out.println(path.getAbsolutePath())
+    	if(path.exists()) throw new Exception("Looks like you are executing this test from a git-tracked directory (" + path + ") ... this can lead to bad things")
+    	dir = dir.getParentFile()
+    }
+  }
+	@Test
+	def returnsFalseWhenThereIsNothingToPush() {
+		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+		  	
+			// GIVEN: A new conduit connected to a depot with an empty history, and a git branch with one change
+			val branch = tempPath("myclone")
+			shell.run("git", "clone", spec.localPath, branch)
+			
+			val haveBefore = p4(spec, shell).doCommand("have")
+			
+			// when: the change is submitted to the conduit
+			val credentials = new P4Credentials("larry", "")
+			val changesFlowed = conduit.pull(branch, credentials)
+			conduit.commit(credentials);
+			
+			// then: 
+			assertTrue("Nothing should have been pushed", !changesFlowed)
+			
+			// there should be no p4 opened files
+			val openedFilesList = p4(spec, shell).doCommand("opened")
+			assertEquals("There should be no opened p4 files", "", openedFilesList)
+			
+			// it should be on the next p4 CL
+			val haveAfter = p4(spec, shell).doCommand("have")
+			assertEquals("The have list for the client should not have changed", haveBefore, haveAfter)
+			
+			// there should be no git changes
+			val localChanges = runGit(shell, branch, "status", "-s")
+			assertEquals("", localChanges)
+			
+		}
+	}
+	
+	@Test
+	def usersCanPushToABlankDepotThroughANewConduit() {
+		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+		  	
+			// GIVEN: A new conduit connected to a depot with an empty history, and a git branch with one change
+			val branch = tempPath("myclone")
+			shell.run("git", "clone", spec.localPath, branch)
+			val newFile = branch / "file.txt"
+			newFile.write("hello world")
+			runGit(shell, branch, "add", ".")
+			runGit(shell, branch, "commit", "-m", "Added_file.txt")
+			
+			val haveBefore = p4(spec, shell).doCommand("have")
+			
+			// when: the change is submitted to the conduit
+			val credentials = new P4Credentials("larry", "")
+			val changesFlowed = conduit.pull(branch, credentials)
+			conduit.commit(credentials);
+			
+			// then: 
+			assertTrue("Some changes should make their way to perforce", changesFlowed)
+			
+			// there should be no p4 opened files
+			val openedFilesList = p4(spec, shell).doCommand("opened")
+			assertEquals("There should be no opened p4 files", "", openedFilesList)
+			
+			// it should be on the next p4 CL
+			val haveAfter = p4(spec, shell).doCommand("have")
+			println("Has: " + haveAfter)
+			assertTrue("The have list for the client should have changed", haveBefore != haveAfter)
+			assertTrue("The client should have the files", haveAfter.contains("//depot/file.txt#1"))
+			
+			// there should be no git changes
+			val gitChanges = runGit(shell, branch, "status", "-s")
+			assertEquals("", gitChanges)
+			
+		}
+	}
+	
 	def runE2eTest(test:(CommandRunner, ClientSpec, GitP4Conduit)=>Unit){
-		val path = tempDir()
+		val path = tempDir("conduit")
 		
 		val shell = new CommandRunnerImpl
 		
@@ -111,105 +196,11 @@ class BzrP4ConduitE2ETest {
 			
 			println("Starting conduit")
 			val conduit = new GitP4Conduit(spec.localPath, shell)
-			conduit.p42bzr()
+			conduit.p42git()
 			println("Started conduit")
 			conduit
 	}
 	
-	@Test
-	def usersCanPushToABlankDepotThroughANewConduit() {
-		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
-		  	
-			// GIVEN: A new conduit connected to a depot with an empty history, and a bzr branch with one change
-			val branch = tempPath()
-			shell.run("git", "clone", spec.localPath, branch)
-			val newFile = branch / "file.txt"
-			newFile.write("hello world")
-			runGit(shell, branch, "add", ".")
-			runGit(shell, branch, "commit", "-m", "Added_file.txt")
-			
-			val haveBefore = p4(spec, shell).doCommand("have")
-			
-			// when: the change is submitted to the conduit
-			val credentials = new P4Credentials("larry", "")
-			val changesFlowed = conduit.pull(branch, credentials)
-			conduit.commit(credentials);
-			
-			// then: 
-			//   1) The changes make their way through to perforce
-			assertTrue("Some changes should make their way to perforce", changesFlowed)
-			
-			//   2) The pull workspace should be in the correct state
-			
-			// there should be no p4 opened files
-			val openedFilesList = p4(spec, shell).doCommand("opened")
-			assertEquals("There should be no opened p4 files", "", openedFilesList)
-			
-			// it should be on the next p4 CL
-			val haveAfter = p4(spec, shell).doCommand("have")
-			println("Has: " + haveAfter)
-			assertTrue("The have list for the client should have changed", haveBefore != haveAfter)
-			assertTrue("The client should have the files", haveAfter.contains("//depot/file.txt#1"))
-			
-			// there should be no bzr changes
-			val bzrChanges = shell.run("bzr", "status", "-D", branch)
-			assertEquals("", bzrChanges)
-			
-			// Once I fix the issue that causes all the extra commits to show-up in the history, we can uncomment this:
-//			// it should be on the same bzr revision it was before the attempt
-//			val bzrInfo = shell.run("bzr", "revno", "-D", branch)
-//			assertEquals("1", bzrInfo.trim())
-		}
-	}
-	
-	
-//	@Test
-//	def usersCantPushWithBadCredentials() {
-//		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:ScmConduit) =>
-//		  	
-//			// GIVEN: A new conduit connected to a depot with an empty history, and a bzr branch with one change
-//			val branch = tempPath()
-//			shell.run("bzr", "branch",  spec.localPath, branch)
-//			val newFile = branch / "file.txt"
-//			newFile.write("hello world")
-//			shell.run("bzr", "add", "-D", branch)
-//			shell.run("bzr", "commit", "-m", "Added_file.txt", "-D", branch)
-//			
-//			// when: the change is submitted to the conduit using the wrong username
-//			val changesFlowed =
-//			try{
-//			  conduit.pull(branch, new P4Credentials("bob", ""))
-//			} catch {
-//			  case _=> false// expected
-//			}
-//			
-//			// then: 
-//			assertFalse("the conduit should have rejected the request", changesFlowed)
-//			
-//			//   2) The pull workspace should be in the correct state
-//			
-//			// there should be no p4 opened files
-//			// it should be on the same p4 cl it was before the attempt
-//			
-//			// there should be no bzr changes
-//			// it should be on the same bzr revision it was before the attempt
-//			
-//		}
-//	}
-	
-//	dir("files",
-//			    file("a.txt", "joeff in a"),
-//			    file("b.txt", "joeff in b"),
-//			    dir("details", 
-//			    	file("larry.txt", "joeff in larry")
-//			    )
-//			)	
-//	def dir(name:String, nodes:FSNode*) = new Directory(name, nodes:_*)
-//	def file(name:String, contents:String) = new File(name, contents)
-//	
-//	class FSNode(name:String)
-//	class Directory(name:String, nodes:FSNode*) extends FSNode(name)
-//	class File(name:String, contents:String) extends FSNode(name)
 	
 	class UserSpec(val id:String, val email:String, val fullName:String){
 	  override def toString = """User: """ + id + """

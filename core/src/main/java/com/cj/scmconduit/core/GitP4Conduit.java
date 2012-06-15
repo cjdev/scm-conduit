@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -15,10 +16,12 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 
 import com.cj.scmconduit.core.bzr.BzrFile;
 import com.cj.scmconduit.core.bzr.BzrStatus;
 import com.cj.scmconduit.core.bzr.LogEntry;
+import com.cj.scmconduit.core.git.GitFileStatus;
 import com.cj.scmconduit.core.git.GitStatus;
 import com.cj.scmconduit.core.p4.P4;
 import com.cj.scmconduit.core.p4.P4Changelist;
@@ -38,47 +41,6 @@ public class GitP4Conduit {
 	private static final String TEMP_FILE_NAME=".scm-conduit-temp";
 	private static final String META_FILE_NAME=".scm-conduit";
 
-	enum Mode {
-		GIT2P4,
-		P42GIT,
-		ROLLBACK,
-		COMMIT
-	}
-
-	public static void main(String[] args) throws Exception {
-		try {
-
-			CommandRunner shell = new CommandRunnerImpl();
-
-			File cwd = new File(System.getProperty("user.dir"));
-
-			GitP4Conduit conduit = new GitP4Conduit(cwd, shell);
-			P4Credentials credentials = new P4Credentials(System.getProperty("user.name"), "");
-			 
-			Mode mode = Mode.valueOf(args[0].toUpperCase());
-			System.out.println(mode + " mode");
-			switch(mode){
-			case GIT2P4:
-				conduit.pull(args[1], credentials);
-				break;
-			case ROLLBACK:
-				conduit.rollback();
-				break;
-			case COMMIT:
-				conduit.commit(credentials);
-				break;
-			case P42GIT:
-				conduit.p42bzr();
-				break;
-			default:
-				throw new RuntimeException("NOT IMPLEMENTED: " + mode);
-			}
-
-		} catch (Throwable e) {
-			System.out.println("Error!");
-			e.printStackTrace(System.out);
-		}
-	}
 
 	private final File conduitPath;
 	private final P4 p4;
@@ -101,7 +63,7 @@ public class GitP4Conduit {
 	}
 
 
-	public void p42bzr() throws Exception {
+	public void p42git() throws Exception {
 		final int p4TimeZoneOffset = findP4TimeZoneOffset();
 
 		boolean keepPumping = true;
@@ -210,18 +172,18 @@ public class GitP4Conduit {
 		return state.lastSyncedP4Changelist;
 	}
 
-	public void rollback() throws Exception {
-		//		BzrStatus s = BzrStatus.read(runGit("xmlstatus"));
-		p4.doCommand("revert", "//...");
-		runGit("revert");
-
-		Integer changelistNum = new Integer(new BufferedReader(new FileReader(tempFile())).readLine().trim());
-
-		p4.doCommand("changelist", "-d", changelistNum.toString());
-
-		if(!tempFile().delete())
-			throw new IOException("Cannot delete file: " + TEMP_FILE_NAME);
-	}
+//	public void rollback() throws Exception {
+//		//		BzrStatus s = BzrStatus.read(runGit("xmlstatus"));
+//		p4.doCommand("revert", "//...");
+//		runGit("revert");
+//
+//		Integer changelistNum = new Integer(new BufferedReader(new FileReader(tempFile())).readLine().trim());
+//
+//		p4.doCommand("changelist", "-d", changelistNum.toString());
+//
+//		if(!tempFile().delete())
+//			throw new IOException("Cannot delete file: " + TEMP_FILE_NAME);
+//	}
 
 	private File tempFile(){
 		return new File(conduitPath, TEMP_FILE_NAME);
@@ -229,68 +191,69 @@ public class GitP4Conduit {
 
 	public void commit(P4Credentials using) throws Exception {
 
-		File tempFile = tempFile(); 
-		if(!tempFile.exists())
-			throw new RuntimeException("Cannot find" + tempFile.getAbsolutePath());
-
-		Long p4ChangelistId = new Long(FileUtils.readFileToString(tempFile));
-		
-		P4 p4 = p4ForUser(using);
-		
-		p4.doCommand("submit", "-c", p4ChangelistId.toString());
-		runGit("commit", "-m", "Pushed to p4 as changelist " + p4ChangelistId);
-
-		if(!tempFile.delete())
-			throw new IOException("Cannot delete file: " + tempFile.getAbsolutePath());
-
-
-		assertNoGitChanges();
+//		File tempFile = tempFile(); 
+//		if(!tempFile.exists())
+//			throw new RuntimeException("Cannot find" + tempFile.getAbsolutePath());
+//
+//		Long p4ChangelistId = new Long(FileUtils.readFileToString(tempFile));
+//		
+//		P4 p4 = p4ForUser(using);
+//		
+//		p4.doCommand("submit", "-c", p4ChangelistId.toString());
+//		runGit("commit", "-m", "Pushed to p4 as changelist " + p4ChangelistId);
+//
+//		if(!tempFile.delete())
+//			throw new IOException("Cannot delete file: " + tempFile.getAbsolutePath());
+//
+//
+//		assertNoGitChanges();
 	}
 
 
-	private P4 p4ForUser(P4Credentials using) {
-		ConduitState state = readState();
-		
-		P4 p4 = new P4(
-				new P4DepotAddress(state.p4Port), 
-				new P4ClientId(state.p4ClientId),
-				using.user,
-				conduitPath, 
-				shell);
-		return p4;
-	}
+//	private P4 p4ForUser(P4Credentials using) {
+//		ConduitState state = readState();
+//		
+//		P4 p4 = new P4(
+//				new P4DepotAddress(state.p4Port), 
+//				new P4ClientId(state.p4ClientId),
+//				using.user,
+//				conduitPath, 
+//				shell);
+//		return p4;
+//	}
 	
-	public void shelveADiff(String changelistDescription, File pathToDiff) throws Exception {
-
-		File tempFile = tempFile(); 
-		if(!tempFile.exists())
-			throw new RuntimeException("Cannot find" + tempFile.getAbsolutePath());
-
-		Long p4ChangelistId = new Long(FileUtils.readFileToString(tempFile));
-		
-		shell.run("patch", "-d", this.conduitPath.getAbsolutePath(), "-p0", "-i", pathToDiff.getAbsolutePath());
-		
-		p4.doCommand("shelve", "-c", p4ChangelistId.toString());
-		p4.doCommand("revert", "./...");
-		runGit("revert");
-		
-		if(!tempFile.delete())
-			throw new IOException("Cannot delete file: " + tempFile.getAbsolutePath());
-
-		assertNoGitChanges();
-	}
+//	public void shelveADiff(String changelistDescription, File pathToDiff) throws Exception {
+//
+//		File tempFile = tempFile(); 
+//		if(!tempFile.exists())
+//			throw new RuntimeException("Cannot find" + tempFile.getAbsolutePath());
+//
+//		Long p4ChangelistId = new Long(FileUtils.readFileToString(tempFile));
+//		
+//		shell.run("patch", "-d", this.conduitPath.getAbsolutePath(), "-p0", "-i", pathToDiff.getAbsolutePath());
+//		
+//		p4.doCommand("shelve", "-c", p4ChangelistId.toString());
+//		p4.doCommand("revert", "./...");
+//		runGit("revert");
+//		
+//		if(!tempFile.delete())
+//			throw new IOException("Cannot delete file: " + tempFile.getAbsolutePath());
+//
+//		assertNoGitChanges();
+//	}
 	
 
-	private void shelve2Diff(String string) {
-		// p4 unshelve
-		// bzr add
-		// patch = `bzr diff`
-		// revert()
-		// stdout << patch
-	}
+//	private void shelve2Diff(String string) {
+//		 p4 unshelve
+//		 bzr add
+//		 patch = `bzr diff`
+//		 revert()
+//		 stdout << patch
+//	}
 	
 	String runGit(String ... args){
 		List<String> a = new ArrayList<String>(Arrays.asList(args));
+//		a.add(0, "--exec-path=" + this.conduitPath.getAbsolutePath());
 		a.add(0, "--git-dir=" + new File(this.conduitPath, ".git").getAbsolutePath());
 		a.add(0, "--work-tree=" + this.conduitPath.getAbsolutePath());
 		return shell.run("git", a.toArray(new String[]{}));
@@ -308,38 +271,120 @@ public class GitP4Conduit {
 			throw new RuntimeException("I was expecting there to be no local git changes, but I found some:\n" + status);
 		}
 	}
-
+	private enum GitOp {
+		A
+	}
 	public boolean pull(String source, P4Credentials using){
-
-		if(!getGitStatus().isUnchanged()){
-			throw new RuntimeException("There are unsaved changes.  You need to roll back.");
+		try{
+			String currentRev = runGit("log", "-1", "--format=%H").trim();
+			runGit("remote", "add", "temp", source);
+			runGit("fetch", "temp");
+			System.out.println("Remotes are " + runGit("remote"));
+			runGit("branch", "incoming", "temp/master");
+			runGit("checkout", "incoming");
+			final String missing = runGit("cherry", "master");
+			runGit("checkout", "master");
+//			runGit("remote", "rm", "temp");
+			System.out.println("Missing is " + missing);
+			if(missing.isEmpty()){
+				return false;
+			}else{
+				List<String> lines = IOUtils.readLines(new StringReader(missing));
+				for(String line : lines){
+					System.out.println("Need to fetch " + line);
+					String rev = line.replaceAll(Pattern.quote("+"), "").trim();
+					runGit("merge", "incoming", rev);
+					String log = runGit("log", "--name-status", currentRev + ".." + rev);
+					log = stripStuff(log);
+					System.out.println("Log is " + log);
+					
+					final Integer changeListNum = createP4ChangelistWithMessage("revision " + rev, p4);
+					for(String changeLine : (List<String>) IOUtils.readLines(new StringReader(log))){ 
+						GitOp gitOp = GitOp.valueOf(changeLine.substring(0, 1));
+						String file = changeLine.substring(2);
+						System.out.println("  NEXT: " + changeLine);
+						System.out.println("   CHANGE: " + gitOp);
+						System.out.println("     FILE: " + file);
+//						changeLine.charAt(0)
+						
+						switch(gitOp){
+						case A: {
+							p4.doCommand("add", "-c", changeListNum.toString(), file);
+							break;
+						}
+						default: throw new RuntimeException("I don't know how to handle " + gitOp);
+						}
+					}
+					p4.doCommand("submit", "-c", changeListNum.toString());
+				}
+				
+				return true;
+			}
+		}catch(Exception e){
+			throw new RuntimeException(e);
 		}
+		
+		
 
-		runGit("rebase", source);
-
-		final GitStatus s = getGitStatus();
-
-		if(s.isUnchanged()){
-			System.out.println("There are no new changes");
-			return false;
-		}else{
-			final P4 p4 = p4ForUser(using);
-			final Integer changeListNum = createP4ChangelistFromBzrStatus(s, p4);
-
-			writeTempFile(changeListNum);
+//		if(!getGitStatus().isUnchanged()){
+//			throw new RuntimeException("There are unsaved changes.  You need to roll back.");
+//		}
+//		
+//		String revBefore = runGit("log", "-1", "--format=%H");
+//		System.out.println("Revision before was " + revBefore);
+//
+//		runGit("remote", "add", "temp", source);
+//		runGit("fetch", "temp");
+//		String missing = runGit("cherry", "remotes/temp/master");
+//		runGit("remote", "rm", "temp");
+//		String revAfter = runGit("log", "-1", "--format=%H");
+//		System.out.println("missing " + missing);
+//		if(revBefore.equals(revAfter)){
+//			System.out.println("There are no new changes");
+//			return false;
+//		}else{
+//			final P4 p4 = p4ForUser(using);
 			
-			return true;
-		}
+//			runGit("remote", "add", "temp", source);
+			
+			// for each pulled revision, submit to p4
+			
+//			final Integer changeListNum = createP4ChangelistFromBzrStatus(s, p4);
+//
+//			writeTempFile(changeListNum);
+			
+//			return true;
+//			throw new RuntimeException("Not sure how to translate git commits to p4 yet");
+//		}
 	}
 	
-	private Integer createP4ChangelistFromBzrStatus(final GitStatus s, final P4 p4) {
-		final String message = createP4MessageFromBzrStatus(s);
-		
-		final Integer changeListNum = createP4ChangelistWithMessage(message, p4);
+//	private Integer createP4ChangelistFromBzrStatus(final GitStatus s, final P4 p4) {
+//		final String message = createP4MessageFromBzrStatus(s);
+//		
+//		final Integer changeListNum = createP4ChangelistWithMessage(message, p4);
+//
+//		translateBzrStatusToP4Changelist(s, changeListNum, p4);
+//		return changeListNum;
+//	}
 
-		translateBzrStatusToP4Changelist(s, changeListNum, p4);
-		return changeListNum;
+	private String stripStuff(String log) {
+		try{
+			StringBuilder text = new StringBuilder();
+			BufferedReader r = new BufferedReader(new StringReader(log));
+			for(String line = r.readLine(); line!=null; line = r.readLine()){
+				if(line.startsWith("commit ") || line.startsWith("Author") || line.startsWith("Date:") || line.trim().isEmpty() || line.startsWith("    ")){
+					// do nothing
+				}else{
+					text.append(line);
+					text.append("\n");
+				}
+			}
+			return text.toString();
+		}catch(Exception e){
+			throw new RuntimeException(e);
+		}
 	}
+
 
 	private void writeTempFile(final Integer changeListNum) {
 		try {
@@ -417,21 +462,21 @@ public class GitP4Conduit {
 	}
 
 
-	private String createP4MessageFromBzrStatus(BzrStatus s) {
-		String message;
-		{
-			StringBuilder changeLog = new StringBuilder();
-			for(int x=s.pendingMerges.size()-1;x>=0;x--){
-				if(x>0){
-					changeLog.append("\n");
-				}
-				LogEntry next = s.pendingMerges.get(x);
-				changeLog.append(next.message);
-			}
-			message = changeLog.toString().replaceAll(Pattern.quote("\n"), "\n	");
-		}
-		return message;
-	}
+//	private String createP4MessageFromBzrStatus(BzrStatus s) {
+//		String message;
+//		{
+//			StringBuilder changeLog = new StringBuilder();
+//			for(int x=s.pendingMerges.size()-1;x>=0;x--){
+//				if(x>0){
+//					changeLog.append("\n");
+//				}
+//				LogEntry next = s.pendingMerges.get(x);
+//				changeLog.append(next.message);
+//			}
+//			message = changeLog.toString().replaceAll(Pattern.quote("\n"), "\n	");
+//		}
+//		return message;
+//	}
 
 
 	private Integer createChangelist(final String changelistText,  final P4 p4) {

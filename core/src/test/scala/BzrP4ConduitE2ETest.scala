@@ -10,7 +10,7 @@ import RichFile._
 import org.junit.Assert._
 import com.cj.scmconduit.core.GitP4Conduit
 
-class GitP4ConduitE2ETest {
+class BzrP4ConduitE2ETest {
   
 	def runE2eTest(test:(CommandRunner, ClientSpec, BzrP4Conduit)=>Unit){
 		val path = tempDir()

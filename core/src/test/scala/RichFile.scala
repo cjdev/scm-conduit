@@ -6,13 +6,13 @@ object RichFile {
 	implicit def enrichFile( file: LocalPath ) = new RichFile( file )
 	implicit def stringify( file: LocalPath ) = file.getAbsolutePath()
 	
-	def tempPath() = {
-	  val path = LocalPath.createTempFile("temp", ".path");
+	def tempPath(name:String = "") = {
+	  val path = LocalPath.createTempFile("temp",  name + ".path");
 	  if(!path.delete()) throw new Exception("Could not delete file from " + path);
 	  path
 	}
-	def tempDir() = {
-	  val path = LocalPath.createTempFile("temp", ".dir");
+	def tempDir(name:String = "") = {
+	  val path = LocalPath.createTempFile("temp", name + ".dir");
 	  if(!(path.delete() && path.mkdir())) throw new Exception("Could not create directory at " + path);
 	  path
 	}
