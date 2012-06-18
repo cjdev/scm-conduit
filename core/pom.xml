@@ -59,6 +59,21 @@
 		</plugins>
 	</build>
 	<dependencies>
+	    <dependency>
+			<groupId>com.cj.scmconduit.p4</groupId>
+			<artifactId>scm-conduit-p4</artifactId>
+			<version>${pom.version}</version>	        
+	    </dependency>
+	    <dependency>
+			<groupId>com.cj.scmconduit.bzr</groupId>
+			<artifactId>scm-conduit-bzr</artifactId>
+			<version>${pom.version}</version>	        
+	    </dependency>
+	    <dependency>
+			<groupId>com.cj.scmconduit.git</groupId>
+			<artifactId>scm-conduit-git</artifactId>
+			<version>${pom.version}</version>	        
+	    </dependency>
 		<dependency>
 			<groupId>javax.xml.bind</groupId>
 			<artifactId>jaxb-api</artifactId>

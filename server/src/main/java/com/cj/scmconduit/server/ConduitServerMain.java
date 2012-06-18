@@ -16,6 +16,10 @@ import org.apache.commons.io.FileUtils;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.httpobjects.HttpObject;
+import org.httpobjects.Request;
+import org.httpobjects.Response;
+import org.httpobjects.jetty.HttpObjectsJettyHandler;
 import org.mortbay.jetty.Handler;
 import org.mortbay.jetty.Server;
 import org.mortbay.jetty.handler.ResourceHandler;
@@ -83,7 +87,7 @@ public class ConduitServerMain {
 		credentials.put("someuser", "test");
 	}
 	
-	public ConduitServerMain(Config config) throws Exception {
+	public ConduitServerMain(final Config config) throws Exception {
 		this.path = config.path;
 		this.tempDirPath = new File(this.path, "tmp");
 		if(!this.tempDirPath.exists() || !this.tempDirPath.isDirectory()){
@@ -95,15 +99,13 @@ public class ConduitServerMain {
 		
 		jetty = new Server(8034);
 		ResourceHandler defaultHandler = new ResourceHandler();
-		VFSResource root = new VFSResource("/");
+		final VFSResource root = new VFSResource("/");
 		defaultHandler.setBaseResource(root);
 		defaultHandler.setWelcomeFiles(new String[]{"hi.txt"});
-		List<Handler> handlers = new ArrayList<Handler>();
+		final List<Handler> handlers = new ArrayList<Handler>();
 		handlers.add(defaultHandler);
 		
-		
-		
-		TempDirAllocator allocator = new TempDirAllocator() {
+		final TempDirAllocator allocator = new TempDirAllocator() {
 			private Set<File> allocatedPaths = new HashSet<File>();
 			public File newTempDir() {
 				try {
@@ -130,23 +132,47 @@ public class ConduitServerMain {
 		
 		
 		for(ConduitConfig conduit: config.conduits){
-			URI publicUri = URI(basePublicUrl + conduit.hostingPath);
-			ConduitController controller = new ConduitController(publicUri, conduit.localPath, allocator);
-			controller.start();
-			
-			
-			handlers.add(new ConduitHandler(conduit.hostingPath, controller));
-			
-			// For basic read-only "GET" access
-			root.addVResource(conduit.hostingPath, conduit.localPath);
+			ConduitHandler handler = prepareConduit(basePublicUrl, root, allocator, conduit);
+			handlers.add(handler);
 		}
 		
 		// Add shared repository
 		root.addVResource("/.bzr", new File(config.path, ".bzr"));
 		
+		handlers.add(new HttpObjectsJettyHandler(new HttpObject("/message"){
+			@Override
+			public Response get(Request req) {
+				return OK(Html("<html><body>Hello, World!</body></html"));
+			}
+		},
+		new AddConduitResource(new AddConduitResource.Listener() {
+			
+			@Override
+			public void addConduit(String name, String p4Path) {
+				File path = new File(new File(config.path, "conduits"), name);
+				if(!path.mkdir()) throw new RuntimeException("Could not create directory at " + path);
+				ConduitConfig conduit = new ConduitConfig("name", path);
+				ConduitHandler handler = prepareConduit(basePublicUrl, root, allocator, conduit);
+				jetty.addHandler(handler);
+			}
+		})));
+		
 		jetty.setHandlers(handlers.toArray(new Handler[]{}));
 		jetty.start();
 		
+	}
+
+	private ConduitHandler prepareConduit(final String basePublicUrl,
+			VFSResource root, TempDirAllocator allocator, ConduitConfig conduit) {
+		URI publicUri = URI(basePublicUrl + conduit.hostingPath);
+		ConduitController controller = new ConduitController(publicUri, conduit.localPath, allocator);
+		controller.start();
+		
+		ConduitHandler handler = new ConduitHandler(conduit.hostingPath, controller);
+		
+		// For basic read-only "GET" access
+		root.addVResource(conduit.hostingPath, conduit.localPath);
+		return handler;
 	}
 	
 	URI URI(String uri){

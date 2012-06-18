@@ -21,7 +21,7 @@ class GitP4ConduitE2ETest {
     while(dir!=null){
         var path = new LocalPath(dir, ".git")
     	System.out.println(path.getAbsolutePath())
-    	if(path.exists()) throw new Exception("Looks like you are executing this test from a git-tracked directory (" + path + ") ... this can lead to bad things")
+    	if(path.exists()) println("WARNING:\n\nLooks like you are executing this test from a git-tracked directory (" + path + ") ... this can lead to bad things")
     	dir = dir.getParentFile()
     }
   }
@@ -114,7 +114,7 @@ class GitP4ConduitE2ETest {
 			
 			
 			// when
-			conduit.p42git()
+			conduit.push()
 			
 			// then
 			val branch = tempPath("myclone")
@@ -244,28 +244,11 @@ class GitP4ConduitE2ETest {
 			
 			println("Starting conduit")
 			val conduit = new GitP4Conduit(spec.localPath, shell)
-			conduit.p42git()
+			conduit.push()
 			println("Started conduit")
 			conduit
 	}
 	
 	
-	class UserSpec(val id:String, val email:String, val fullName:String){
-	  override def toString = """User: """ + id + """
-Email: """ + email + """
-FullName: """ + fullName
-	}
-	
-	class ClientSpec(val localPath:LocalPath, val owner:String, val clientId:String, val host:String, val view:List[Tuple2[String, String]]){
-		  override def toString = """
-Client:  """ + clientId + """
-Owner:  """ + owner + """
-Host:    """ + host + """
-Root:   """ + localPath.getAbsolutePath() + """
-Options:        noallwrite noclobber nocompress unlocked nomodtime normdir
-SubmitOptions:  submitunchanged
-LineEnd:        local
-View:""" + view.map(mapping=> "\n   " + mapping._1 + " " + "//" + clientId + mapping._2).mkString("")
-		}
-	
+
 }
