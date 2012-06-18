@@ -24,10 +24,11 @@ import com.cj.scmconduit.core.bzr.BzrStatus;
 import com.cj.scmconduit.core.bzr.LogEntry;
 import com.cj.scmconduit.core.p4.{
 	P4, P4Impl, P4Changelist, P4ClientId, P4Credentials, 
-	P4DepotAddress, P4RevRangeSpec, P4RevSpec, P4SyncOutputParser, P4Time}
+	P4DepotAddress, P4RevRangeSpec, P4RevSpec, P4SyncOutputParser, P4Time, ClientSpec}
 import com.cj.scmconduit.core.p4.P4SyncOutputParser.{Change,ChangeType}
 import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.core.util.CommandRunnerImpl;
+import RichFile._
 
 object BzrP4Conduit {
 
@@ -40,6 +41,37 @@ object BzrP4Conduit {
 				p4TimeZoneOffsetInMinutes
 		);
 	}
+	
+	def create(p4Address:P4DepotAddress, spec:ClientSpec, shell:CommandRunner){
+			val p4:P4 = new P4Impl(
+					p4Address, 
+					new P4ClientId(spec.clientId),
+					spec.owner,
+					spec.localPath, 
+					shell)
+	  
+			println(spec)
+			val changes = p4.doCommand(new ByteArrayInputStream(spec.toString().getBytes()), "client", "-i")
+			println(changes)
+			
+			shell.run("bzr", "init", spec.localPath.toString())
+					
+			// start conduit
+			
+			if(!spec.localPath.isDirectory) throw new Exception("No such directory: " + spec.localPath)
+			
+			val file = spec.localPath/".scm-conduit"
+			file.createNewFile()
+			file.write(
+				<scm-conduit-state>
+					<last-synced-p4-changelist>0</last-synced-p4-changelist>
+					<p4-port>{p4Address}</p4-port>
+					<p4-read-user>{spec.owner}</p4-read-user>
+					<p4-client-id>{spec.clientId}</p4-client-id>
+				</scm-conduit-state>
+			    )
+			
+	}
 }
 
 class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner) extends Conduit {
@@ -47,20 +79,22 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	private val META_FILE_NAME = ".scm-conduit"
 
 	
+	private var p4Address:P4DepotAddress = new P4DepotAddress(readState().p4Port)
 	private var p4:P4 = {
-	val state = readState();
-    println(FileUtils.readFileToString(new File(conduitPath, META_FILE_NAME)))
-    println("The port is " + state.p4Port)
-	  new P4Impl(
-				new P4DepotAddress(state.p4Port), 
-				new P4ClientId(state.p4ClientId),
-				state.p4ReadUser,
-				conduitPath, 
-				shell)
+		val state = readState();
+	    println(FileUtils.readFileToString(new File(conduitPath, META_FILE_NAME)))
+	    println("The port is " + state.p4Port)
+		  new P4Impl(
+					p4Address, 
+					new P4ClientId(state.p4ClientId),
+					state.p4ReadUser,
+					conduitPath, 
+					shell)
 	}
 
 	
-	def push() { 
+	
+	override def push() { 
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
 
 		var keepPumping = true;

@@ -1,21 +1,32 @@
 package com.cj.scmconduit.server;
 
+import scala.collection.immutable.List;
+
+import java.io.File;
+
 import org.httpobjects.HttpObject;
 import org.httpobjects.Request;
 import org.httpobjects.Response;
+
+import scala.Tuple2;
+
+import com.cj.scmconduit.core.BzrP4Conduit;
+import com.cj.scmconduit.core.p4.ClientSpec;
+import com.cj.scmconduit.core.p4.P4DepotAddress;
+import com.cj.scmconduit.core.util.CommandRunner;
+import com.cj.scmconduit.server.config.Config;
 
 public class AddConduitResource extends HttpObject {
 	public interface Listener {
 		void addConduit(String name, String p4Path);
 	}
-	
-	private Listener listener;
+	private final Listener listener;
 	
 	public AddConduitResource(Listener listener) {
 		super("/admin");
 		this.listener = listener;
 	}
-	
+
 	@Override
 	public Response get(Request req) {
 		return OK(Html(

@@ -17,6 +17,7 @@ import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.p4.P4DepotAddress;
 import com.cj.scmconduit.core.p4.P4Impl;
 import com.cj.scmconduit.core.p4.P4;
+import com.cj.scmconduit.core.p4.ClientSpec;
 import com.cj.scmconduit.core.p4.P4RevRangeSpec;
 import com.cj.scmconduit.core.p4.P4RevSpec;
 import com.cj.scmconduit.core.p4.P4SyncOutputParser.Change;

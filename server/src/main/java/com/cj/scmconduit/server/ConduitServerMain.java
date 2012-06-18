@@ -24,8 +24,14 @@ import org.mortbay.jetty.Handler;
 import org.mortbay.jetty.Server;
 import org.mortbay.jetty.handler.ResourceHandler;
 
+import scala.Tuple2;
+
+import com.cj.scmconduit.core.BzrP4Conduit;
+import com.cj.scmconduit.core.p4.ClientSpec;
+import com.cj.scmconduit.core.p4.P4DepotAddress;
+import com.cj.scmconduit.core.util.CommandRunner;
+import com.cj.scmconduit.core.util.CommandRunnerImpl;
 import com.cj.scmconduit.server.conduit.ConduitController;
-import com.cj.scmconduit.server.config.ConduitConfig;
 import com.cj.scmconduit.server.config.Config;
 import com.cj.scmconduit.server.fs.TempDirAllocator;
 import com.cj.scmconduit.server.jetty.ConduitHandler;
@@ -37,8 +43,12 @@ public class ConduitServerMain {
 			setupLogging();
 			doBzrSafetyCheck();
 			
-			Config config = autoConfig(new File(args[0]));
-			config.publicHostname = args.length>1?args[1]:InetAddress.getLocalHost().getCanonicalHostName();
+			File path = new File(args[0]);
+			String p4Address = args[1];
+			String p4User = args[2];
+			String publicHostname = args.length>3?args[3]:InetAddress.getLocalHost().getCanonicalHostName();
+			
+			Config config = new Config(publicHostname, path, p4Address, p4User);
 			
 			new ConduitServerMain(config);
 		} catch (Exception e) {
@@ -64,21 +74,6 @@ public class ConduitServerMain {
 		}
 	}
 	
-	private static Config autoConfig(File where){
-		File conduitsDir = new File(where, "conduits");
-		
-		List<ConduitConfig> conduits = new ArrayList<ConduitConfig>();
-		for(File localPath : conduitsDir.listFiles()){
-			if(localPath.isDirectory() && !localPath.getName().toLowerCase().endsWith(".bak")){
-				String httpPath = "/" + localPath.getName().replaceAll(Pattern.quote("-"), "/");
-				System.out.println("Autodiscovered " + httpPath);
-				conduits.add(new ConduitConfig(httpPath, localPath));
-			}
-		}
-		
-		return new Config(where, conduits.toArray(new ConduitConfig[conduits.size()]));
-	}
-	
 	private final File tempDirPath;
 	private final File path;
 	private final Server jetty;
@@ -96,6 +91,8 @@ public class ConduitServerMain {
 		
 		final String basePublicUrl = "http://" + config.publicHostname + ":8034";
 		System.out.println("My public url is " + basePublicUrl);
+		
+		final P4DepotAddress p4Address = new P4DepotAddress(config.p4Address);
 		
 		jetty = new Server(8034);
 		ResourceHandler defaultHandler = new ResourceHandler();
@@ -130,13 +127,12 @@ public class ConduitServerMain {
 			}
 		};
 		
-		
-		for(ConduitConfig conduit: config.conduits){
+		for(ConduitConfig conduit: findConduits()){
 			ConduitHandler handler = prepareConduit(basePublicUrl, root, allocator, conduit);
 			handlers.add(handler);
 		}
 		
-		// Add shared repository
+		// Add shared bzr repository
 		root.addVResource("/.bzr", new File(config.path, ".bzr"));
 		
 		handlers.add(new HttpObjectsJettyHandler(new HttpObject("/message"){
@@ -149,19 +145,71 @@ public class ConduitServerMain {
 			
 			@Override
 			public void addConduit(String name, String p4Path) {
-				File path = new File(new File(config.path, "conduits"), name);
-				if(!path.mkdir()) throw new RuntimeException("Could not create directory at " + path);
-				ConduitConfig conduit = new ConduitConfig("name", path);
+				final CommandRunner shell = new CommandRunnerImpl();
+				File localPath = new File(config.basePathForNewConduits, name);
+				if(localPath.exists()) throw new RuntimeException("There is already a conduit by that name");
+				
+				String clientId = config.clientIdPrefix + name;
+				
+				@SuppressWarnings("deprecation")
+				scala.collection.immutable.List<Tuple2<String, String>> view = scala.collection.immutable.List.fromArray(new Tuple2[]{
+						new Tuple2<String, String>(p4Path + "/...", "/...")
+				});
+				
+				ClientSpec spec = new ClientSpec(
+									localPath, 
+									config.p4User, 
+									clientId, 
+									config.publicHostname, 
+									view);
+				
+				BzrP4Conduit.create(p4Address, spec, shell);
+				
+				
+				ConduitConfig conduit = new ConduitConfig("name", localPath);
 				ConduitHandler handler = prepareConduit(basePublicUrl, root, allocator, conduit);
 				jetty.addHandler(handler);
 			}
-		})));
+		}
+		)));
 		
 		jetty.setHandlers(handlers.toArray(new Handler[]{}));
 		jetty.start();
 		
 	}
 
+	
+	class ConduitConfig {
+		
+		public final String hostingPath;
+		
+		public final File localPath;
+		
+		public ConduitConfig(String hostingPath, File localPath) {
+			this.hostingPath = hostingPath;
+			this.localPath = localPath;
+		}
+		
+	}
+
+	private List<ConduitConfig> findConduits(){
+		List<ConduitConfig> conduits = new ArrayList<ConduitConfig>();
+		
+		File conduitsDir = new File(path, "conduits");
+		
+		if(!conduitsDir.isDirectory() && !conduitsDir.mkdirs()) throw new RuntimeException("Could not create directory at " + conduitsDir);
+		
+		for(File localPath : conduitsDir.listFiles()){
+			if(localPath.isDirectory() && !localPath.getName().toLowerCase().endsWith(".bak")){
+				String httpPath = "/" + localPath.getName().replaceAll(Pattern.quote("-"), "/");
+				System.out.println("Autodiscovered " + httpPath);
+				conduits.add(new ConduitConfig(httpPath, localPath));
+			}
+		}
+		
+		return conduits;
+	}
+	
 	private ConduitHandler prepareConduit(final String basePublicUrl,
 			VFSResource root, TempDirAllocator allocator, ConduitConfig conduit) {
 		URI publicUri = URI(basePublicUrl + conduit.hostingPath);

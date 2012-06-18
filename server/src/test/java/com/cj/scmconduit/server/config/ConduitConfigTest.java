@@ -14,16 +14,14 @@ public class ConduitConfigTest {
 	private final JAXBContext ctx;
 	
 	public ConduitConfigTest() throws Exception{
-		ctx = JAXBContext.newInstance(ConduitConfig.class, Config.class);
+		ctx = JAXBContext.newInstance(Config.class);
 	}
 	
 	@Test
 	public void run() throws Exception {
 		
-		Config orig = new Config(
-							new File(""), 
-							new ConduitConfig("foo-trunk", new File("here"))
-						);
+		Config orig = new Config();
+		orig.path = new File("");
 		
 		String xml = marshal(orig);
 		System.out.println(xml);
@@ -31,9 +29,6 @@ public class ConduitConfigTest {
 		Config copy = unmarshal(xml);
 
 		assertEquals(orig.path, copy.path);
-		assertEquals(orig.conduits.size(), copy.conduits.size());
-		assertEquals(orig.conduits.get(0).hostingPath, copy.conduits.get(0).hostingPath);
-		assertEquals(orig.conduits.get(0).localPath, copy.conduits.get(0).localPath);
 		
 		String xml2 = marshal(copy);
 		assertEquals(xml, xml2);

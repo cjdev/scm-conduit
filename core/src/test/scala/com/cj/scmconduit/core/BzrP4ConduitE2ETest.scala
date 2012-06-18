@@ -82,32 +82,34 @@ class BzrP4ConduitE2ETest {
 	def p4(spec:ClientSpec, shell:CommandRunner)= new P4Impl(new P4DepotAddress("localhost:1666"), new P4ClientId(spec.clientId), spec.owner, spec.localPath, shell);
 	
 	def createConduit(spec:ClientSpec, shell:CommandRunner) = {
-			println(spec)
-			val changes = p4(spec, shell).doCommand(new ByteArrayInputStream(spec.toString().getBytes()), "client", "-i")
-			println(changes)
+//			println(spec)
+//			val changes = p4(spec, shell).doCommand(new ByteArrayInputStream(spec.toString().getBytes()), "client", "-i")
+//			println(changes)
+//			
+//			shell.run("bzr", "init", spec.localPath)
+//					
+//			// start conduit
+//			
+//			spec.localPath/".scm-conduit" write(
+//				<scm-conduit-state>
+//					<last-synced-p4-changelist>0</last-synced-p4-changelist>
+//					<p4-port>localhost:1666</p4-port>
+//					<p4-read-user>{spec.owner}</p4-read-user>
+//					<p4-client-id>{spec.clientId}</p4-client-id>
+//				</scm-conduit-state>
+//			    )
 			
-			shell.run("bzr", "init", spec.localPath)
-					
-			// start conduit
-			
-			spec.localPath/".scm-conduit" write(
-				<scm-conduit-state>
-					<last-synced-p4-changelist>0</last-synced-p4-changelist>
-					<p4-port>localhost:1666</p4-port>
-					<p4-read-user>{spec.owner}</p4-read-user>
-					<p4-client-id>{spec.clientId}</p4-client-id>
-				</scm-conduit-state>
-			    )
+			if(!spec.localPath.exists && !spec.localPath.mkdirs()) throw new Exception("Could not create directory: " + spec.localPath)
+	  
+			BzrP4Conduit.create(new P4DepotAddress("localhost:1666"), spec, shell)
 			
 			var pathToDirHintFile = spec.localPath/".p4-directory" 
 			pathToDirHintFile.write("this file tells perforce that this is a directory")
 			p4(spec, shell).doCommand("add", pathToDirHintFile)
 			p4(spec, shell).doCommand("submit", "-d", "initial commit")
 			
-			println("Starting conduit")
 			val conduit = new BzrP4Conduit(spec.localPath, shell)
 			conduit.push()
-			println("Started conduit")
 			conduit
 	}
 	
@@ -206,22 +208,22 @@ class BzrP4ConduitE2ETest {
 //	class Directory(name:String, nodes:FSNode*) extends FSNode(name)
 //	class File(name:String, contents:String) extends FSNode(name)
 	
-	class UserSpec(val id:String, val email:String, val fullName:String){
-	  override def toString = """User: """ + id + """
-Email: """ + email + """
-FullName: """ + fullName
-	}
-	
-	class ClientSpec(val localPath:LocalPath, val owner:String, val clientId:String, val host:String, val view:List[Tuple2[String, String]]){
-		  override def toString = """
-Client:  """ + clientId + """
-Owner:  """ + owner + """
-Host:    """ + host + """
-Root:   """ + localPath.getAbsolutePath() + """
-Options:        noallwrite noclobber nocompress unlocked nomodtime normdir
-SubmitOptions:  submitunchanged
-LineEnd:        local
-View:""" + view.map(mapping=> "\n   " + mapping._1 + " " + "//" + clientId + mapping._2).mkString("")
-		}
+//	class UserSpec(val id:String, val email:String, val fullName:String){
+//	  override def toString = """User: """ + id + """
+//Email: """ + email + """
+//FullName: """ + fullName
+//	}
+//	
+//	class ClientSpec(val localPath:LocalPath, val owner:String, val clientId:String, val host:String, val view:List[Tuple2[String, String]]){
+//		  override def toString = """
+//Client:  """ + clientId + """
+//Owner:  """ + owner + """
+//Host:    """ + host + """
+//Root:   """ + localPath.getAbsolutePath() + """
+//Options:        noallwrite noclobber nocompress unlocked nomodtime normdir
+//SubmitOptions:  submitunchanged
+//LineEnd:        local
+//View:""" + view.map(mapping=> "\n   " + mapping._1 + " " + "//" + clientId + mapping._2).mkString("")
+//		}
 	
 }
