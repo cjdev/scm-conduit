@@ -16,6 +16,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import com.cj.scmconduit.core.BzrP4Conduit;
+import com.cj.scmconduit.core.Conduit;
 import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.core.util.CommandRunnerImpl;
@@ -26,7 +27,7 @@ public class ConduitController implements Pusher {
 	private final URI publicUri;
 	private final File pathOnDisk;
 	private final List<PushRequest> requests = new LinkedList<PushRequest>();
-	private final BzrP4Conduit conduit;
+	private final Conduit conduit;
 	private final CommandRunner shell = new CommandRunnerImpl();
 
 	private final Map<Integer, PushSession> pushes = new HashMap<Integer, PushSession>();

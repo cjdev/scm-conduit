@@ -24,7 +24,7 @@ import com.cj.scmconduit.core.util.CommandRunner;
 
 import scala.collection.JavaConversions._
 
-class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner) {
+class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner) extends Conduit {
 //	private static final String TEMP_FILE_NAME=".scm-conduit-temp";
 	private val META_FILE_NAME=".scm-conduit";
 
@@ -39,11 +39,11 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 				)
 		  }
 
-	def commit(using:P4Credentials) {}
+	override def commit(using:P4Credentials) {}
 	
-	def rollback() {}
+	override def rollback() {}
 	
-	def push() {
+	override def push() {
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
 
 		var keepPumping = true;
@@ -118,7 +118,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		}
 	}
 	
-	def pull(source:String, using:P4Credentials):Boolean = {
+	override def pull(source:String, using:P4Credentials):Boolean = {
 		val currentRev = runGit("log", "-1", "--format=%H").trim();
 		runGit("remote", "add", "temp", source);
 		runGit("fetch", "temp");
@@ -150,38 +150,5 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 			return true;
 		}
 	}
-
-//	private void writeTempFile(final Integer changeListNum) {
-//		try {
-//			FileWriter f = new FileWriter(tempFile());
-//			f.write(Integer.toString(changeListNum));
-//			f.close();
-//		} catch (IOException e) {
-//			throw new RuntimeException(e);
-//		}
-//	}
-//
-//	private void recursiveMove(File currentOnDiskLocation, String oldRelPath, String newRelPath, Integer changeListNum, Set<String> filesMoved){
-//		for(File childPath : currentOnDiskLocation.listFiles()){
-//			String childOldRelPath = oldRelPath + "/" + childPath.getName();
-//			String childNewRelPath = newRelPath + "/" + childPath.getName();
-//
-//			if(!childPath.exists()){
-//				throw new RuntimeException(childPath.getAbsolutePath() + " doesn't exist!");
-//			}else if(childPath.isDirectory()){
-//				recursiveMove(childPath, childOldRelPath, childNewRelPath, changeListNum, filesMoved);
-//			}else{
-//				System.out.println("Moving child file at " + childPath.getAbsolutePath());
-//				p4.doCommand("edit", "-c", changeListNum.toString(), "-k", childOldRelPath);
-//				p4.doCommand("move", "-c", changeListNum.toString(), "-k", childOldRelPath, childNewRelPath);
-//				filesMoved.add(childNewRelPath);
-//			}
-//		}
-//
-//		// Tell perforce to delete the directory (not that it really tracks them, but this at least keeps them from showing-up on other workspaces)
-//		if(new File(conduitPath, oldRelPath).exists()){
-//			p4.doCommand("delete", "-c", changeListNum.toString(), "-k", oldRelPath);
-//		}
-//	}
 
 }

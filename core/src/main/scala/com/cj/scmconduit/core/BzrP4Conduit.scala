@@ -42,7 +42,7 @@ object BzrP4Conduit {
 	}
 }
 
-class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner) {
+class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner) extends Conduit {
 	private val TEMP_FILE_NAME = ".scm-conduit-temp"
 	private val META_FILE_NAME = ".scm-conduit"
 
@@ -154,7 +154,7 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
     
 	private def tempFile() = {new File(conduitPath, TEMP_FILE_NAME)}
 	
-	def commit(using:P4Credentials) {
+	override def commit(using:P4Credentials) {
 		
 		val tempFile = this.tempFile(); 
 		if(!tempFile.exists())
@@ -231,7 +231,7 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		}
 	}
 
-	def pull(source:String, using:P4Credentials):Boolean = {
+	override def pull(source:String, using:P4Credentials):Boolean = {
 
 		if(!BzrStatus.read(runBzr("xmlstatus")).isUnchanged()){
 			throw new RuntimeException("There are unsaved changes.  You need to roll back.");
