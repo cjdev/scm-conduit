@@ -10,6 +10,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
@@ -27,7 +29,9 @@ import org.mortbay.jetty.handler.ResourceHandler;
 import scala.Tuple2;
 
 import com.cj.scmconduit.core.BzrP4Conduit;
+import com.cj.scmconduit.core.GitP4Conduit;
 import com.cj.scmconduit.core.p4.ClientSpec;
+import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.p4.P4DepotAddress;
 import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.core.util.CommandRunnerImpl;
@@ -127,9 +131,11 @@ public class ConduitServerMain {
 			}
 		};
 		
+		final List<ConduitStuff> conduits = new ArrayList<ConduitServerMain.ConduitStuff>();
 		for(ConduitConfig conduit: findConduits()){
-			ConduitHandler handler = prepareConduit(basePublicUrl, root, allocator, conduit);
-			handlers.add(handler);
+			ConduitStuff stuff = prepareConduit(basePublicUrl, root, allocator, conduit);
+			conduits.add(stuff);
+			handlers.add(stuff.handler);
 		}
 		
 		// Add shared bzr repository
@@ -141,10 +147,44 @@ public class ConduitServerMain {
 				return OK(Html("<html><body>Hello, World!</body></html"));
 			}
 		},
+		new HttpObject("/"){
+			@Override
+			public Response get(Request req) {
+				StringBuilder text = new StringBuilder();
+				text.append("<html><body>");
+				
+				text.append("<form action=\"/admin\"><input type=\"submit\" value=\"Add Conduit\"/></form><hr/>");
+				SortedSet<String> paths = new TreeSet<String>();
+
+				for(ConduitStuff conduit: conduits){
+					paths.add(conduit.p4path);
+				}
+				
+				for(String path: paths){
+					List<ConduitStuff> atPath = new ArrayList<ConduitServerMain.ConduitStuff>();
+					for(ConduitStuff conduit: conduits){
+						if(conduit.p4path.equals(path)){
+							atPath.add(conduit);
+						}
+					}
+					text.append("<div>" + path + "<div><ul>");
+					
+					for(ConduitStuff conduit: atPath){
+						final String p4path = conduit.p4path;
+						final String url = basePublicUrl + conduit.config.hostingPath + (new File(conduit.config.localPath, ".git").exists()?"/.git":"");
+						text.append("<li><a href=\"" + url + "\">" + url + "</a></li>");
+					}
+					text.append("</ul></div></div>");
+					
+				}
+				text.append("</body></html>");
+				return OK(Html(text.toString()));
+			}
+		},
 		new AddConduitResource(new AddConduitResource.Listener() {
 			
 			@Override
-			public void addConduit(String name, String p4Path) {
+			public void addConduit(ConduitType type, String name, String p4Path) {
 				final CommandRunner shell = new CommandRunnerImpl();
 				File localPath = new File(config.basePathForNewConduits, name);
 				if(localPath.exists()) throw new RuntimeException("There is already a conduit by that name");
@@ -163,11 +203,19 @@ public class ConduitServerMain {
 									config.publicHostname, 
 									view);
 				
-				BzrP4Conduit.create(p4Address, spec, shell);
+				P4Credentials credentials = new P4Credentials(config.p4User, "");
+				
+				if(type == ConduitType.GIT){
+					GitP4Conduit.create(p4Address, spec, shell, credentials);
+				}else if(type == ConduitType.BZR){
+					BzrP4Conduit.create(p4Address, spec, shell, credentials);
+				}else{
+					throw new RuntimeException("not sure how to create a \"" + type + "\" conduit");
+				}
 				
 				
 				ConduitConfig conduit = new ConduitConfig("name", localPath);
-				ConduitHandler handler = prepareConduit(basePublicUrl, root, allocator, conduit);
+				ConduitHandler handler = prepareConduit(basePublicUrl, root, allocator, conduit).handler;
 				jetty.addHandler(handler);
 			}
 		}
@@ -185,7 +233,8 @@ public class ConduitServerMain {
 		
 		public final File localPath;
 		
-		public ConduitConfig(String hostingPath, File localPath) {
+		private ConduitConfig(String hostingPath, File localPath) {
+			super();
 			this.hostingPath = hostingPath;
 			this.localPath = localPath;
 		}
@@ -201,8 +250,8 @@ public class ConduitServerMain {
 		
 		for(File localPath : conduitsDir.listFiles()){
 			if(localPath.isDirectory() && !localPath.getName().toLowerCase().endsWith(".bak")){
-				String httpPath = "/" + localPath.getName().replaceAll(Pattern.quote("-"), "/");
-				System.out.println("Autodiscovered " + httpPath);
+				String httpPath = "/" + localPath.getName();//.replaceAll(Pattern.quote("-"), "/");
+				
 				conduits.add(new ConduitConfig(httpPath, localPath));
 			}
 		}
@@ -210,7 +259,24 @@ public class ConduitServerMain {
 		return conduits;
 	}
 	
-	private ConduitHandler prepareConduit(final String basePublicUrl,
+	class ConduitStuff {
+		final String p4path;
+		final ConduitConfig config;
+		final ConduitHandler handler;
+		final ConduitController controller;
+		
+		private ConduitStuff(ConduitConfig config, ConduitHandler handler,
+				ConduitController controller) {
+			super();
+			this.config = config;
+			this.handler = handler;
+			this.controller = controller;
+			this.p4path = controller.p4Path();
+		}
+		
+	}
+	
+	private ConduitStuff prepareConduit(final String basePublicUrl,
 			VFSResource root, TempDirAllocator allocator, ConduitConfig conduit) {
 		URI publicUri = URI(basePublicUrl + conduit.hostingPath);
 		ConduitController controller = new ConduitController(publicUri, conduit.localPath, allocator);
@@ -219,8 +285,9 @@ public class ConduitServerMain {
 		ConduitHandler handler = new ConduitHandler(conduit.hostingPath, controller);
 		
 		// For basic read-only "GET" access
+		System.out.println("Serving " + conduit.localPath + " at " + conduit.hostingPath);
 		root.addVResource(conduit.hostingPath, conduit.localPath);
-		return handler;
+		return new ConduitStuff(conduit, handler, controller);
 	}
 	
 	URI URI(String uri){

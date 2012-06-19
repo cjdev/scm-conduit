@@ -29,6 +29,12 @@ def post(uriText):
 destinationUri = sys.argv[1]
 print "destination: " + destinationUri
 
+if len(sys.argv) > 2:
+    print "length is " + str(len(sys.argv))
+    user = sys.argv[2]
+else:
+    user = None
+
 #bridge = sys.argv[1]
 #destination = sys.argv[2]
 
@@ -43,9 +49,21 @@ data = json.loads(response)
 pushLocation = data['pushLocation']
 resultLocation = data['resultLocation']
 
+if user != None :
+    pushLocation = pushLocation \
+                    .replace("sftp://", "sftp://" + user + "@") \
+                    .replace("ssh://", "ssh://" + user + "@")
+
 print "Pushing to " + pushLocation
 
-os.system('bzr push ' + pushLocation)
+if os.path.exists(".git"):
+    cmd = "git push " + pushLocation
+elif os.path.exists(".bzr"):
+    cmd = "bzr push " + pushLocation
+else:
+    raise Exception("This doesn't appear to be a directory that is tracked by a known scm")
+    
+os.system(cmd)
 
 while(True):
   urlParts = urlparse(destinationUri)

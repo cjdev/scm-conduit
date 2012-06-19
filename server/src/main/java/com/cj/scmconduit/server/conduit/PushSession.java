@@ -6,20 +6,15 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 
 import org.apache.sshd.SshServer;
-import org.apache.sshd.common.NamedFactory;
-import org.apache.sshd.server.Command;
 import org.apache.sshd.server.FileSystemFactory;
 import org.apache.sshd.server.FileSystemView;
 import org.apache.sshd.server.PasswordAuthenticator;
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider;
 import org.apache.sshd.server.session.ServerSession;
-import org.apache.sshd.server.sftp.SftpSubsystem;
 
-import com.cj.scmconduit.core.bzr.Bzr;
 import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.server.ssh.SshFsView;
@@ -27,25 +22,35 @@ import com.cj.scmconduit.server.ssh.SshFsView;
 public class PushSession {
 	public enum State {WAITING_FOR_INPUT, WORKING, FINISHED}
 	
+	public interface PushStrategy {
+		void prepareDestinationDirectory(URI publicUri, File codePath, CommandRunner shell);
+		String constructPushUrl(String hostname, Integer port, String path);
+		void configureSshDaemon(SshServer sshd, final File path, int port);
+	}
+	
 	private PushSession.State state = State.WAITING_FOR_INPUT;
 
 	private final Integer pushId;
 	private final SshDaemon sshServer;
 	private final File onDisk;
 	private final String hostname;
+	private final PushStrategy strategy;
 	
 	private boolean hadErrors = false;
 	private String explanation;
 	
 	private boolean isOpen = true;
 	
-	PushSession(Integer id, URI publicUri, File onDisk, CommandRunner shell) {
+	PushSession(Integer id, URI publicUri, File onDisk, PushStrategy strategy, CommandRunner shell) {
 		this.pushId = id;
 		this.onDisk = onDisk;
 		this.hostname = publicUri.getHost();
+		this.strategy = strategy;
 		
-		this.sshServer = new SshDaemon(onDisk, pushId);
-		new Bzr(shell).createStackedBranch(publicUri.toString(), codePath().getAbsolutePath());
+		this.sshServer = new SshDaemon(onDisk, pushId, strategy);
+		
+		
+		strategy.prepareDestinationDirectory(publicUri, codePath(), shell);
 		
 	}
 	
@@ -136,18 +141,17 @@ public class PushSession {
 	}
 
 	public String sftpUrl(){
-		return "sftp://" + hostname + ":" + pushId + "/code";
+		return strategy.constructPushUrl(hostname,  pushId, "/code");//"ssh://" + hostname + ":" + pushId + "/code";
 	}
 	
 	public static class SshDaemon {
 		private final List<P4Credentials> credentialsReceived = new ArrayList<P4Credentials>();
 		private final SshServer sshd;
 		
-		public SshDaemon(final File path, int port) { 
+		public SshDaemon(final File path, int port, PushStrategy strategy) { 
 			System.out.println("Serving " + path + " at port " + port);
 			try {
 				sshd = SshServer.setUpDefaultServer();
-				
 				
 				sshd.setFileSystemFactory(new FileSystemFactory() {
 					public FileSystemView createFileSystemView(String userName) {
@@ -165,8 +169,7 @@ public class PushSession {
 					}
 				});
 				
-				sshd.setSubsystemFactories(new LinkedList<NamedFactory<Command>>());
-				sshd.getSubsystemFactories().add(new SftpSubsystem.Factory());
+				strategy.configureSshDaemon(sshd, path, port);
 				
 				sshd.start();
 			} catch (IOException e) {

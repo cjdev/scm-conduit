@@ -7,4 +7,5 @@ trait Conduit {
 	def commit(using:P4Credentials)
 	def rollback()
 	def push() 
+	def p4Path():String
 }

@@ -11,5 +11,11 @@
 	<artifactId>scm-conduit-git</artifactId>
 	
 	<name>${project.artifactId}</name>	
-	
+	<dependencies>
+	    <dependency>
+			<groupId>com.cj.scmconduit.util</groupId>
+			<artifactId>scm-conduit-util</artifactId>
+	        <version>${project.version}</version>
+	    </dependency>
+    </dependencies>
 </project>

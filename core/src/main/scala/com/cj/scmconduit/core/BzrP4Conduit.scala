@@ -4,16 +4,12 @@ import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileReader;
+import java.io.StringReader
 import java.io.FileWriter;
 import java.io.IOException;
-//import java.util.ArrayList;
-//import java.util.Arrays;
-//import java.util.HashSet;
-//import java.util.LinkedList;
-//import java.util.List;
-//import java.util.Set;
 import java.util.regex.Pattern;
 
+import org.apache.commons.io.IOUtils
 import scala.collection.mutable.ListBuffer
 import scala.collection.JavaConversions._
 
@@ -24,7 +20,7 @@ import com.cj.scmconduit.core.bzr.BzrStatus;
 import com.cj.scmconduit.core.bzr.LogEntry;
 import com.cj.scmconduit.core.p4.{
 	P4, P4Impl, P4Changelist, P4ClientId, P4Credentials, 
-	P4DepotAddress, P4RevRangeSpec, P4RevSpec, P4SyncOutputParser, P4Time, ClientSpec}
+	P4DepotAddress, P4RevRangeSpec, P4RevSpec, P4SyncOutputParser, P4Time, ClientSpec, createDummyInitialP4Commit}
 import com.cj.scmconduit.core.p4.P4SyncOutputParser.{Change,ChangeType}
 import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.core.util.CommandRunnerImpl;
@@ -42,7 +38,7 @@ object BzrP4Conduit {
 		);
 	}
 	
-	def create(p4Address:P4DepotAddress, spec:ClientSpec, shell:CommandRunner){
+	def create(p4Address:P4DepotAddress, spec:ClientSpec, shell:CommandRunner, credentials:P4Credentials = null){
 			val p4:P4 = new P4Impl(
 					p4Address, 
 					new P4ClientId(spec.clientId),
@@ -71,29 +67,48 @@ object BzrP4Conduit {
 				</scm-conduit-state>
 			    )
 			
+			if(credentials!=null){
+				val conduit = new BzrP4Conduit(spec.localPath, shell)
+				
+				createDummyInitialP4Commit(spec.localPath, p4, conduit)
+//				if(spec.localPath.listFiles().filter(!_.getName().startsWith(".")).isEmpty){
+//				  val firstFile = spec.localPath/"firstFile.txt"
+//				  firstFile.write("hello world")
+//				  p4.doCommand("add", "firstFile.txt")
+//				  p4.doCommand("submit", "-d", "first change")
+//				  p4.syncTo(P4RevSpec.forChangelist(0))
+//				  conduit.push()
+//				}
+			}
 	}
 }
 
 class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner) extends Conduit {
 	private val TEMP_FILE_NAME = ".scm-conduit-temp"
 	private val META_FILE_NAME = ".scm-conduit"
-
+ 
 	
-	private var p4Address:P4DepotAddress = new P4DepotAddress(readState().p4Port)
+	private var p4Address:P4DepotAddress = new P4DepotAddress(state().p4Port)
 	private var p4:P4 = {
-		val state = readState();
+		val s = state();
 	    println(FileUtils.readFileToString(new File(conduitPath, META_FILE_NAME)))
-	    println("The port is " + state.p4Port)
+	    println("The port is " + s.p4Port)
 		  new P4Impl(
 					p4Address, 
-					new P4ClientId(state.p4ClientId),
+					new P4ClientId(s.p4ClientId),
 					state.p4ReadUser,
 					conduitPath, 
 					shell)
 	}
 
-	
-	
+//	def initializeEmpty(using:P4Credentials) = {
+//	  val firstFile = conduitPath/"firstFile.txt"
+//	  firstFile.write("hello world")
+//	  runBzr("add", firstFile.get)
+//	  
+//	  sendPendingBzrChangesToPerforce(using)
+//	}
+//	
 	override def push() { 
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
 
@@ -159,19 +174,34 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	private def findDepotChangesSince(lastSync:Long) = p4.changesBetween(P4RevRangeSpec.everythingAfter(lastSync));
 
 	private def recordLastSuccessfulSync(id:Long ) {
-		val state = readState();
-		state.lastSyncedP4Changelist = id;
-		writeState(state);
+		val s = state();
+		s.lastSyncedP4Changelist = id;
+		writeState(s);
+	}
+	
+	def p4Path():String = {
+		val clientSpec = p4.doCommand("client", "-o")
+		
+		var path = ""
+		var inViewSection = false;
+		IOUtils.readLines(new StringReader(clientSpec)).asInstanceOf[java.util.List[String]].foreach{line=>
+		  if(inViewSection){
+		    path += line.trim().split(" ")(0).trim()
+		  }else if(line.trim().startsWith("View:")){
+		    inViewSection = true
+		  }
+		}
+		
+		path
 	}
 
-
-	private def readState() = ConduitState.read(new File(conduitPath, META_FILE_NAME));
+	private def state() = ConduitState.read(new File(conduitPath, META_FILE_NAME));
 
 	private def writeState(state:ConduitState ){
 		ConduitState.write(state, new File(conduitPath, META_FILE_NAME));
 	}
 
-	private def findLastSyncRevision() = readState().lastSyncedP4Changelist
+	private def findLastSyncRevision() = state().lastSyncedP4Changelist
 
 	def rollback() {
 		//		BzrStatus s = BzrStatus.read(runBzr("xmlstatus"));
@@ -210,11 +240,11 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 
 
 	private def p4ForUser(using:P4Credentials):P4 = {
-		val state = readState();
+		val s = state();
 		
 		new P4Impl(
-				new P4DepotAddress(state.p4Port), 
-				new P4ClientId(state.p4ClientId),
+				new P4DepotAddress(s.p4Port), 
+				new P4ClientId(s.p4ClientId),
 				using.user,
 				conduitPath, 
 				shell);
@@ -273,9 +303,14 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 
 		shell.run("bzr", "merge", source, "-d", this.conduitPath.getAbsolutePath());
 
-		val s = BzrStatus.read(runBzr("xmlstatus"));
+		
+		sendPendingBzrChangesToPerforce(using)
+	}
+	
+	private def sendPendingBzrChangesToPerforce(using:P4Credentials):Boolean = {
+	  val s = BzrStatus.read(runBzr("xmlstatus"));
 
-		if(s.isUnchanged()){
+	  if(s.isUnchanged()){
 			System.out.println("There are no new changes");
 			return false;
 		}else{

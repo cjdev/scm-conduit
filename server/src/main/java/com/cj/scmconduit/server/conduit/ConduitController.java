@@ -17,9 +17,11 @@ import org.apache.commons.logging.LogFactory;
 
 import com.cj.scmconduit.core.BzrP4Conduit;
 import com.cj.scmconduit.core.Conduit;
+import com.cj.scmconduit.core.GitP4Conduit;
 import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.core.util.CommandRunnerImpl;
+import com.cj.scmconduit.server.conduit.PushSession.PushStrategy;
 import com.cj.scmconduit.server.fs.TempDirAllocator;
 
 public class ConduitController implements Pusher {
@@ -29,7 +31,7 @@ public class ConduitController implements Pusher {
 	private final List<PushRequest> requests = new LinkedList<PushRequest>();
 	private final Conduit conduit;
 	private final CommandRunner shell = new CommandRunnerImpl();
-
+	private final PushStrategy pushStrategy;
 	private final Map<Integer, PushSession> pushes = new HashMap<Integer, PushSession>();
 	private final TempDirAllocator temps;
 	
@@ -40,14 +42,27 @@ public class ConduitController implements Pusher {
 		this.publicUri = publicUri;
 		this.pathOnDisk = pathOnDisk;
 		this.temps = temps;
-		conduit = new BzrP4Conduit(pathOnDisk, shell);
+		
+		if(new File(pathOnDisk, ".bzr").exists()){
+			pushStrategy = new BzrPushStrategy();
+			conduit = new BzrP4Conduit(pathOnDisk, shell);
+		}else if(new File(pathOnDisk, ".git").exists()){
+			pushStrategy = new GitPushStrategy();
+			conduit = new GitP4Conduit(pathOnDisk, shell);
+		}else{
+			throw new RuntimeException("Not sure what kind of conduit this is: " + pathOnDisk);
+		}
+	}
+	
+	public String p4Path(){
+		return conduit.p4Path();
 	}
 	
 	public synchronized PushSession newSession(){
 		Integer id = findAvailableId();
 		log.info("id: " + id);
 		
-		PushSession session = new PushSession(id, publicUri, temps.newTempDir(), shell);
+		PushSession session = new PushSession(id, publicUri, temps.newTempDir(), pushStrategy, shell);
 		pushes.put(session.id(), session);
 		return session;
 	}
