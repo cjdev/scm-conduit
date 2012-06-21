@@ -49,7 +49,7 @@ object GitP4Conduit {
 			spec.localPath/".scm-conduit" write(
 				<scm-conduit-state>
 					<last-synced-p4-changelist>0</last-synced-p4-changelist>
-					<p4-port>localhost:1666</p4-port>
+					<p4-port>{p4Address}</p4-port>
 					<p4-read-user>{spec.owner}</p4-read-user>
 					<p4-client-id>{spec.clientId}</p4-client-id>
 				</scm-conduit-state>

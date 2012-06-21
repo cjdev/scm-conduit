@@ -53,7 +53,7 @@ class P42GitTranslator (private val conduitPath:File) {
 		
 		gitCommands.add(asList(
 				"commit", 
-				"--author=Joe Schmo <" + nextChange.whoString() + ">",
+				"--author=" + nextChange.whoString() + " <" + nextChange.whoString() + ">",
 				"--date=" + toBzrCommitDateFormat(nextChange.getWhen(), p4TimeZoneOffset),
 				"--allow-empty",
 				"-m", "[P4 CHANGELIST " + nextChange.id() + "]\n" + nextChange.description()));
