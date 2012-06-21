@@ -184,7 +184,7 @@ public class ConduitServerMain {
 		new AddConduitResource(new AddConduitResource.Listener() {
 			
 			@Override
-			public void addConduit(ConduitType type, String name, String p4Path) {
+			public void addConduit(ConduitType type, String name, String p4Path, Integer p4FirstCL) {
 				final CommandRunner shell = new CommandRunnerImpl();
 				File localPath = new File(config.basePathForNewConduits, name);
 				if(localPath.exists()) throw new RuntimeException("There is already a conduit by that name");
@@ -206,9 +206,9 @@ public class ConduitServerMain {
 				P4Credentials credentials = new P4Credentials(config.p4User, "");
 				
 				if(type == ConduitType.GIT){
-					GitP4Conduit.create(p4Address, spec, shell, credentials);
+					GitP4Conduit.create(p4Address, spec, p4FirstCL, shell, credentials);
 				}else if(type == ConduitType.BZR){
-					BzrP4Conduit.create(p4Address, spec, shell, credentials);
+					BzrP4Conduit.create(p4Address, spec, p4FirstCL, shell, credentials);
 				}else{
 					throw new RuntimeException("not sure how to create a \"" + type + "\" conduit");
 				}

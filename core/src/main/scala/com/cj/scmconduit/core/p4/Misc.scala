@@ -11,7 +11,7 @@ package object p4 {
 	  val firstFile = path/"firstFile.txt"
 	  firstFile.write("hello world")
 	  p4.doCommand("add", "firstFile.txt")
-	  p4.doCommand("submit", "-d", "first change")
+	  p4.doCommand("submit", "-d", "initial commit")
 	  p4.syncTo(P4RevSpec.forChangelist(0))
 	  conduit.push()
 	}

@@ -6,7 +6,7 @@ import org.httpobjects.Response;
 
 public class AddConduitResource extends HttpObject {
 	public interface Listener {
-		void addConduit(ConduitType type, String name, String p4Path);
+		void addConduit(ConduitType type, String name, String p4Path, Integer p4FirstCL);
 	}
 	private final Listener listener;
 	
@@ -22,6 +22,7 @@ public class AddConduitResource extends HttpObject {
 				"	<form action=\"/admin\" method=\"post\" >" +
 				"		<div>Name: <input type=\"text\" name=\"name\"/></div>" +
 				"		<div>Perforce Path: <input type=\"text\" name=\"p4path\"/></div>" +
+				"		<div>Fetch History Since: <input type=\"text\" name=\"p4FirstCL\"/></div>" +
 				"		<div>Conduit Type: <select name=\"type\">" +
 				"			<option>" + ConduitType.BZR + "</option>" + 
 				"			<option>" + ConduitType.GIT + "</option>" + 
@@ -37,11 +38,12 @@ public class AddConduitResource extends HttpObject {
 			ConduitType type = ConduitType.valueOf(req.getParameter("type"));
 			String name = req.getParameter("name");
 			String p4path = req.getParameter("p4path");
+			Integer p4FirstCL = Integer.parseInt(req.getParameter("p4FirstCL"));
 			
 			if(name.contains("-")){
 				return OK(Text("Sorry, conduit names must not contain hyphens"));
 			}else{
-				listener.addConduit(type, name, p4path);
+				listener.addConduit(type, name, p4path, p4FirstCL);
 				return OK(Text("Created a " + type + " conduit named \"" + name + "\" to " + p4path));
 			}
 			

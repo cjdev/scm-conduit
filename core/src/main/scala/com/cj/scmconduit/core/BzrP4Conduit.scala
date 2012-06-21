@@ -38,7 +38,7 @@ object BzrP4Conduit {
 		);
 	}
 	
-	def create(p4Address:P4DepotAddress, spec:ClientSpec, shell:CommandRunner, credentials:P4Credentials = null){
+	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials = null){
 			val p4:P4 = new P4Impl(
 					p4Address, 
 					new P4ClientId(spec.clientId),

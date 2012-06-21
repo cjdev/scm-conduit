@@ -28,7 +28,7 @@ import com.cj.scmconduit.core.git.Git
 
 object GitP4Conduit {
   
-	def create(p4Address:P4DepotAddress, spec:ClientSpec, shell:CommandRunner, credentials:P4Credentials) = {
+	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials = null) {
 		    spec.localPath.mkdirs()
 		    
 			val p4:P4 = new P4Impl(
@@ -46,9 +46,11 @@ object GitP4Conduit {
 			
 			git.run("init")
 					
+			val lastSyncedP4Changelist = if(p4FirstCL==0) p4FirstCL else p4FirstCL - 1
+			
 			spec.localPath/".scm-conduit" write(
 				<scm-conduit-state>
-					<last-synced-p4-changelist>0</last-synced-p4-changelist>
+					<last-synced-p4-changelist>{lastSyncedP4Changelist}</last-synced-p4-changelist>
 					<p4-port>{p4Address}</p4-port>
 					<p4-read-user>{spec.owner}</p4-read-user>
 					<p4-client-id>{spec.clientId}</p4-client-id>
@@ -184,7 +186,6 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		val currentRev = git.run("log", "-1", "--format=%H").trim();
 		git.run("remote", "add", "temp", source);
 		git.run("fetch", "temp");
-		System.out.println("Remotes are " + git.run("remote"));
 		git.run("branch", "incoming", "temp/master");
 		git.run("checkout", "incoming");
 		val missing = git.run("cherry", "master");

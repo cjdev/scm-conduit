@@ -220,33 +220,14 @@ class GitP4ConduitE2ETest {
 	}
 	
 	def  createGitConduit(spec:ClientSpec, shell:CommandRunner) = {
-			println(spec)
-			val changes = p4(spec, shell).doCommand(new ByteArrayInputStream(spec.toString().getBytes()), "client", "-i")
-			println(changes)
-			
-			runGit(shell, spec.localPath, "init")
-					
-			// start conduit
-			
-			spec.localPath/".scm-conduit" write(
-				<scm-conduit-state>
-					<last-synced-p4-changelist>0</last-synced-p4-changelist>
-					<p4-port>localhost:1666</p4-port>
-					<p4-read-user>{spec.owner}</p4-read-user>
-					<p4-client-id>{spec.clientId}</p4-client-id>
-				</scm-conduit-state>
-			    )
-			
-			var pathToDirHintFile = spec.localPath/".p4-directory" 
-			pathToDirHintFile.write("this file tells perforce that this is a directory")
-			p4(spec, shell).doCommand("add", pathToDirHintFile)
-			p4(spec, shell).doCommand("submit", "-d", "initial commit")
-			
-			println("Starting conduit")
-			val conduit = new GitP4Conduit(spec.localPath, shell)
-			conduit.push()
-			println("Started conduit")
-			conduit
+		
+		GitP4Conduit.create(new P4DepotAddress("localhost:1666"), spec, 0, shell, new P4Credentials("whoever", ""))
+  
+		println("Starting conduit")
+		val conduit = new GitP4Conduit(spec.localPath, shell)
+		conduit.push()
+		println("Started conduit")
+		conduit
 	}
 	
 	
