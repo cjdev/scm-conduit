@@ -3,6 +3,7 @@ package com.cj.scmconduit.server;
 import org.httpobjects.HttpObject;
 import org.httpobjects.Request;
 import org.httpobjects.Response;
+import org.httpobjects.header.response.LocationField;
 
 public class AddConduitResource extends HttpObject {
 	public interface Listener {
@@ -22,7 +23,7 @@ public class AddConduitResource extends HttpObject {
 				"	<form action=\"/admin\" method=\"post\" >" +
 				"		<div>Name: <input type=\"text\" name=\"name\"/></div>" +
 				"		<div>Perforce Path: <input type=\"text\" name=\"p4path\"/></div>" +
-				"		<div>Fetch History Since: <input type=\"text\" name=\"p4FirstCL\"/></div>" +
+				"		<div>Fetch History Since: <input type=\"text\" name=\"p4FirstCL\"/ value=\"0\"></div>" +
 				"		<div>Conduit Type: <select name=\"type\">" +
 				"			<option>" + ConduitType.BZR + "</option>" + 
 				"			<option>" + ConduitType.GIT + "</option>" + 
@@ -44,7 +45,7 @@ public class AddConduitResource extends HttpObject {
 				return OK(Text("Sorry, conduit names must not contain hyphens"));
 			}else{
 				listener.addConduit(type, name, p4path, p4FirstCL);
-				return OK(Text("Created a " + type + " conduit named \"" + name + "\" to " + p4path));
+				return SEE_OTHER(new LocationField("/"));
 			}
 			
 		}catch(Exception e){

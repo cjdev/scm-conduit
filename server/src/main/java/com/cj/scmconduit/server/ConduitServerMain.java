@@ -170,7 +170,6 @@ public class ConduitServerMain {
 					text.append("<div>" + path + "<div><ul>");
 					
 					for(ConduitStuff conduit: atPath){
-						final String p4path = conduit.p4path;
 						final String url = basePublicUrl + conduit.config.hostingPath + (new File(conduit.config.localPath, ".git").exists()?"/.git":"");
 						text.append("<li><a href=\"" + url + "\">" + url + "</a></li>");
 					}
@@ -214,9 +213,10 @@ public class ConduitServerMain {
 				}
 				
 				
-				ConduitConfig conduit = new ConduitConfig("name", localPath);
-				ConduitHandler handler = prepareConduit(basePublicUrl, root, allocator, conduit).handler;
-				jetty.addHandler(handler);
+				ConduitConfig conduit = new ConduitConfig("/" + name, localPath);
+				ConduitStuff stuff = prepareConduit(basePublicUrl, root, allocator, conduit);
+				conduits.add(stuff);
+				jetty.addHandler(stuff.handler);
 			}
 		}
 		)));
