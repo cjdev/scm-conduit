@@ -37,17 +37,21 @@ class P42GitTranslator (private val conduitPath:File) {
 		}
 		
 		if(adds.size()>0){
-			val args = new ArrayList[String](adds.size()+1);
-			args.add("add");
+		  
+			adds.grouped(10).foreach{group=>
+				val args = new ArrayList[String](group.size()+1)
+				args.add("add")
+				args.add("-f")
+				
+				group.foreach{add=>
+					val branchPath = add.workspacePath
+					assertIsConduitFile(branchPath)
+					args.add(branchPath)
+				}
+				
+				gitCommands.add(args)
+			  }
 			
-			adds.foreach{add=>
-				val branchPath = add.workspacePath;
-				assertIsConduitFile(branchPath);
-				args.add(branchPath);
-			}
-			
-			System.out.println("adding " + adds.size());
-			gitCommands.add(args);
 		}
 		//runGit("add");
 		
