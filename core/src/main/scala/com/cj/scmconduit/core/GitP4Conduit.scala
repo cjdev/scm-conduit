@@ -101,13 +101,22 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 				assertNoGitChanges();
 				val changes = p4.syncTo(P4RevSpec.forChangelist(nextChange.id()));
 				
-				val gitCommands = new P42GitTranslator(conduitPath).translate(nextChange, changes, p4TimeZoneOffset);
-				gitCommands.foreach{command=>
-					git.run(command:_*);
+				val status = new GitStatus(git.run("status", "-s"))
+				
+				val filesICareAbout = status.files.filter{change=>change.file != ".scm-conduit"}
+				
+				if (filesICareAbout.size > 0){
+				  
+					val gitCommands = new P42GitTranslator(conduitPath).translate(nextChange, changes, p4TimeZoneOffset);
+					gitCommands.foreach{command=>
+						git.run(command:_*);
+					}
+					
+					git.run("update-server-info")
 				}
 				
-				git.run("update-server-info")
 				assertNoGitChanges();
+				
 				recordLastSuccessfulSync(nextChange.id());
 			}
 		}
