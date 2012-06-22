@@ -24,7 +24,7 @@ class P42GitTranslatorTest {
     val result = testSubject.translate(cl, changes, p4TimeZoneOffset)
     
     // THEN
-    assertEquals(List("add", where/"fido.dog" getAbsolutePath),result.get(0).toList)
+    assertEquals(List("add", "-f", where/"fido.dog" getAbsolutePath),result.get(0).toList)
     assertEquals(List("commit", "--author=sally <sally>", "--date=2012-04-24 11:32:323 +0500", "--allow-empty", "-m", "[P4 CHANGELIST 23]\nbought a dog"),result.get(1).toList)
   }
   

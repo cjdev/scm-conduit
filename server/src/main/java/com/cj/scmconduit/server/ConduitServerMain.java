@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
-import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.BasicConfigurator;
@@ -22,6 +21,8 @@ import org.httpobjects.HttpObject;
 import org.httpobjects.Request;
 import org.httpobjects.Response;
 import org.httpobjects.jetty.HttpObjectsJettyHandler;
+import org.httpobjects.util.HttpObjectUtil;
+import org.httpobjects.util.Method;
 import org.mortbay.jetty.Handler;
 import org.mortbay.jetty.Server;
 import org.mortbay.jetty.handler.ResourceHandler;
@@ -135,19 +136,12 @@ public class ConduitServerMain {
 		for(ConduitConfig conduit: findConduits()){
 			ConduitStuff stuff = prepareConduit(basePublicUrl, root, allocator, conduit);
 			conduits.add(stuff);
-			handlers.add(stuff.handler);
 		}
 		
 		// Add shared bzr repository
 		root.addVResource("/.bzr", new File(config.path, ".bzr"));
 		
-		handlers.add(new HttpObjectsJettyHandler(new HttpObject("/message"){
-			@Override
-			public Response get(Request req) {
-				return OK(Html("<html><body>Hello, World!</body></html"));
-			}
-		},
-		new HttpObject("/"){
+		HttpObject mainPage = new HttpObject("/"){
 			@Override
 			public Response get(Request req) {
 				StringBuilder text = new StringBuilder();
@@ -179,14 +173,16 @@ public class ConduitServerMain {
 				text.append("</body></html>");
 				return OK(Html(text.toString()));
 			}
-		},
-		new AddConduitResource(new AddConduitResource.Listener() {
+		};
+		HttpObject addConduitPage = new AddConduitResource(new AddConduitResource.Listener() {
 			
 			@Override
 			public void addConduit(ConduitType type, String name, String p4Path, Integer p4FirstCL) {
 				final CommandRunner shell = new CommandRunnerImpl();
 				File localPath = new File(config.basePathForNewConduits, name);
-				if(localPath.exists()) throw new RuntimeException("There is already a conduit by that name");
+				System.out.println("I am going to create something at " + localPath);
+				if(localPath.exists()) throw new RuntimeException("There is already a conduit called \"" + name + "\" " +
+						"(given that there is already a directory at " + localPath.getAbsolutePath() + ")");
 				
 				String clientId = config.clientIdPrefix + name;
 				
@@ -212,20 +208,59 @@ public class ConduitServerMain {
 					throw new RuntimeException("not sure how to create a \"" + type + "\" conduit");
 				}
 				
-				
 				ConduitConfig conduit = new ConduitConfig("/" + name, localPath);
 				ConduitStuff stuff = prepareConduit(basePublicUrl, root, allocator, conduit);
 				conduits.add(stuff);
-				jetty.addHandler(stuff.handler);
 			}
-		}
-		)));
+		});
+		
+		HttpObject depotHandler = new HttpObject("/{conduitName}/{remainder*}") {
+			
+			public ConduitStuff findConduitForPath(String conduitName) {
+				ConduitStuff foundConduit = null;
+				for (ConduitStuff conduit : conduits) {
+					final String next = conduit.handler.name;
+					System.out.println(next);
+					if (conduitName.equals(next)) {
+						foundConduit = conduit;
+					}
+				}
+				return foundConduit;
+			}
+			
+			public Response relay(Request req, final Method m) {
+				String conduitName = "/" + req.pathVars().valueFor("conduitName");
+				
+				ConduitStuff match = findConduitForPath(conduitName);
+				if(match!=null) return HttpObjectUtil.invokeMethod(match.handler, m, req);
+				else {
+					System.out.println("There is no conduit at " + conduitName);
+					return null;
+				}
+				
+			}
+			
+			@Override
+			public Response get(Request req) {
+				return relay(req, Method.GET);
+			}
+			
+			@Override
+			public Response post(Request req) {
+				return relay(req, Method.POST);
+			}
+		};
+
+		handlers.add(new HttpObjectsJettyHandler(mainPage, addConduitPage, depotHandler));
 		
 		jetty.setHandlers(handlers.toArray(new Handler[]{}));
 		jetty.start();
 		
 	}
-
+	
+	interface MethodInvoker {
+		Response invoke(Request req, HttpObject o);
+	}
 	
 	class ConduitConfig {
 		
@@ -276,8 +311,7 @@ public class ConduitServerMain {
 		
 	}
 	
-	private ConduitStuff prepareConduit(final String basePublicUrl,
-			VFSResource root, TempDirAllocator allocator, ConduitConfig conduit) {
+	private ConduitStuff prepareConduit(final String basePublicUrl, VFSResource root, TempDirAllocator allocator, ConduitConfig conduit) {
 		URI publicUri = URI(basePublicUrl + conduit.hostingPath);
 		ConduitController controller = new ConduitController(publicUri, conduit.localPath, allocator);
 		controller.start();

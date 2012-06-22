@@ -23,7 +23,7 @@ public class PushSession {
 	public enum State {WAITING_FOR_INPUT, WORKING, FINISHED}
 	
 	public interface PushStrategy {
-		void prepareDestinationDirectory(URI publicUri, File codePath, CommandRunner shell);
+		void prepareDestinationDirectory(URI publicUri, File conduitLocation, File codePath, CommandRunner shell);
 		String constructPushUrl(String hostname, Integer port, String path);
 		void configureSshDaemon(SshServer sshd, final File path, int port);
 	}
@@ -41,7 +41,7 @@ public class PushSession {
 	
 	private boolean isOpen = true;
 	
-	PushSession(Integer id, URI publicUri, File onDisk, PushStrategy strategy, CommandRunner shell) {
+	PushSession(Integer id, URI publicUri, File conduitLocation, File onDisk, PushStrategy strategy, CommandRunner shell) {
 		this.pushId = id;
 		this.onDisk = onDisk;
 		this.hostname = publicUri.getHost();
@@ -50,7 +50,7 @@ public class PushSession {
 		this.sshServer = new SshDaemon(onDisk, pushId, strategy);
 		
 		
-		strategy.prepareDestinationDirectory(publicUri, codePath(), shell);
+		strategy.prepareDestinationDirectory(publicUri, conduitLocation, codePath(), shell);
 		
 	}
 	

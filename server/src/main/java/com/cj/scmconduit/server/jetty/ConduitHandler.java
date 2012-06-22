@@ -1,25 +1,22 @@
 package com.cj.scmconduit.server.jetty;
 
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.mortbay.jetty.handler.AbstractHandler;
+import org.httpobjects.HttpObject;
+import org.httpobjects.Request;
+import org.httpobjects.Response;
 
 import com.cj.scmconduit.server.conduit.ConduitController;
 import com.cj.scmconduit.server.conduit.PushSession;
+import com.cj.scmconduit.server.conduit.PushSession.State;
 
-public class ConduitHandler extends AbstractHandler {
+public class ConduitHandler extends HttpObject {
 	
 	private final Log log;
-	private final String path;
+	public final String name;
 	private final ConduitController controller;
 	private final Map<String, SessionResource> sessions = new HashMap<String, ConduitHandler.SessionResource>();
 	
@@ -27,82 +24,73 @@ public class ConduitHandler extends AbstractHandler {
 		final String restPath;
 		final PushSession session;
 		
-		public SessionResource(PushSession session) {
+		private SessionResource(PushSession session) {
 			super();
-			this.restPath = statusPathFor(session);;
+			this.restPath = name + "/" + ".scm-conduit-push-session-" + session.id();
 			this.session = session;
 		}
-		private String statusPathFor(PushSession session){
-			if(path.endsWith("/")){
-				return path + ".scm-conduit-push-session-" + session.id();
-			}else{
-				return path + "/.scm-conduit-push-session-" + session.id();
-			}
-		}
+		
 	}
 	
-	public ConduitHandler(String path, ConduitController controller) {
-		super();
-		log = LogFactory.getLog(getClass()+":" + path);
-		this.path = path;
+	public ConduitHandler(String name, ConduitController controller) {
+		super(name + "/{remainder*}");
+		this.name = name;
+		log = LogFactory.getLog(getClass()+":" + name);
 		this.controller = controller;
 	}
 
-	public void handle(String target, HttpServletRequest request,
-			HttpServletResponse response, int dispatch) throws IOException,
-			ServletException {
-		try{
+	@Override
+	public Response post(Request req) {
+		String remainder = req.pathVars().valueFor("remainder");
+		if(remainder==null || remainder.equals("")){
+			log.info("Creating session");
 			
-			if(!target.startsWith(path)) return;
-			log.info("Request for " + target);
+			SessionResource session = new SessionResource(controller.newSession());
+			log.info("created session: " + session);
 			
-			final String method = request.getMethod();
+			sessions.put(session.restPath, session);
 			
-			if(target.equals(path)){
-				if(method.equals("POST")){
-					log.info("Creating session");
-					
-					SessionResource session = new SessionResource(controller.newSession());
-					log.info("created session: " + session);
-					
-					sessions.put(session.restPath, session);
-					
-					
-					send("{\n" + 
-							"\"pushLocation\":\"" + session.session.sftpUrl() + "\",\n" + 
-							"\"resultLocation\":\"" + session.restPath + "\"\n" + 
-							"}", response);
-				}
-				
-			}else{
-				
-				final SessionResource resource = sessions.get(target);
-				if(resource!=null){
-					if(resource.session.state() == PushSession.State.WAITING_FOR_INPUT){
-						resource.session.inputReceived(controller);
-						send("WORKING", response);
-					}else if(resource.session.state() == PushSession.State.WORKING){
-						send("WORKING", response);
-					}else if(resource.session.state() == PushSession.State.FINISHED){
-						if(resource.session.hadErrors()){
-							send("ERROR:" + resource.session.explanation(), response);
-						}else{
-							send("OK:" + resource.session.explanation(), response);
-						}
-					}
-				}
-				
-			}
-		} catch (Throwable t){
-			log.error("There was an error in the conduit handler", t);
-			throw new RuntimeException(t);
+			return OK(Json("{\n" + 
+					"\"pushLocation\":\"" + session.session.sftpUrl() + "\",\n" + 
+					"\"resultLocation\":\"" + session.restPath + "\"\n" + 
+					"}"));
+		}else{
+			return BAD_REQUEST();
 		}
 	}
-
-	private void send(String text, HttpServletResponse response) throws IOException{
-		PrintWriter w = response.getWriter();
-		w.write(text);
-		w.close();
+	
+	
+	@Override
+	public Response get(Request req) {
+		String remainder = req.pathVars().valueFor("remainder");
+		String path = name + (remainder==null?"":("/" + remainder));	
+		
+		final SessionResource resource = sessions.get(path);
+		
+		final Response r;
+		
+		if(resource!=null){
+			final State state = resource.session.state();
+			
+			if(state == PushSession.State.WAITING_FOR_INPUT){
+				resource.session.inputReceived(controller);
+				r = OK(Text("WORKING"));
+			}else if(state == PushSession.State.WORKING){
+				r = OK(Text("WORKING"));
+			}else if(state == PushSession.State.FINISHED){
+				if(resource.session.hadErrors()){
+					r = OK(Text("ERROR:" + resource.session.explanation()));
+				}else{
+					r = OK(Text("OK:" + resource.session.explanation()));
+				}
+			}else{
+				r = INTERNAL_SERVER_ERROR(Text("Unknown state: " + state));
+			}
+		}else{
+			r = NOT_FOUND();
+		}
+		
+		return r;
 	}
 
 }

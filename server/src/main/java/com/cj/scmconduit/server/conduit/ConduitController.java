@@ -62,7 +62,7 @@ public class ConduitController implements Pusher {
 		Integer id = findAvailableId();
 		log.info("id: " + id);
 		
-		PushSession session = new PushSession(id, publicUri, temps.newTempDir(), pushStrategy, shell);
+		PushSession session = new PushSession(id, publicUri, pathOnDisk, temps.newTempDir(), pushStrategy, shell);
 		pushes.put(session.id(), session);
 		return session;
 	}

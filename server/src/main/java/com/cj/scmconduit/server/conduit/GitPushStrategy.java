@@ -16,8 +16,8 @@ import com.cj.scmconduit.server.conduit.PushSession.PushStrategy;
 public class GitPushStrategy implements PushStrategy {
 	
 	@Override
-	public void prepareDestinationDirectory(URI publicUri, File codePath, CommandRunner shell) {
-		shell.run("git", "clone", "--bare", publicUri.toString() + "/.git", codePath.getAbsolutePath());
+	public void prepareDestinationDirectory(URI publicUri, File conduitLocation, File codePath, CommandRunner shell) {
+		shell.run("git", "clone", "--bare", conduitLocation.getAbsolutePath() + "/.git", codePath.getAbsolutePath());
 	}
 	
 	@Override
