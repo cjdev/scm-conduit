@@ -41,8 +41,8 @@ object GitP4Conduit {
 		    val git = new Git(shell, spec.localPath);
 		    
 			println(spec)
-			val changes = p4.doCommand(new ByteArrayInputStream(spec.toString().getBytes()), "client", "-i")
-			println(changes)
+			val output = p4.doCommand(new ByteArrayInputStream(spec.toString().getBytes()), "client", "-i")
+			println(output)
 			
 			git.run("init")
 					
