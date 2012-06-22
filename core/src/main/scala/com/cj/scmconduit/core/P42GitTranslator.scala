@@ -30,7 +30,7 @@ class P42GitTranslator (private val conduitPath:File) {
 			
 			changeType match {
 			case ChangeType.ADD => adds.add(next);
-			case ChangeType.DELETE => gitCommands.add(asList("rm", next.workspacePath));
+			case ChangeType.DELETE => gitCommands.add(asList("rm", relativePathFor(next.workspacePath)));
 			case ChangeType.UPDATE => gitCommands.add(asList("add", next.workspacePath));
 			case _=> throw new RuntimeException("Not sure what to do with " + changeType);
 			}
@@ -63,6 +63,13 @@ class P42GitTranslator (private val conduitPath:File) {
 				"-m", "[P4 CHANGELIST " + nextChange.id() + "]\n" + nextChange.description()));
 		
 		return gitCommands;
+	}
+	
+	def relativePathFor(path:String)={
+	  val absoluteConduitPath = conduitPath.getAbsolutePath()
+	  if(!path.startsWith(absoluteConduitPath)) throw new Exception(path + " is not under " + absoluteConduitPath)
+	  
+	  path.substring(absoluteConduitPath.length()+1)
 	}
 	
 	def toBzrCommitDateFormat(when:P4Time, p4TimeZoneOffsetInHours:Int):String = {

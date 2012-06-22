@@ -220,7 +220,6 @@ public class ConduitServerMain {
 				ConduitStuff foundConduit = null;
 				for (ConduitStuff conduit : conduits) {
 					final String next = conduit.handler.name;
-					System.out.println(next);
 					if (conduitName.equals(next)) {
 						foundConduit = conduit;
 					}

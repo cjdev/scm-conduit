@@ -74,6 +74,7 @@ public class PushSession {
 		state = State.FINISHED;
 		this.hadErrors = hasErrors;
 		this.explanation = explanation;
+		System.out.println(getClass().getSimpleName() + " is finished: " + state + "  " + explanation);
 	}
 	
 	public void inputReceived(final Pusher pusher){
