@@ -22,6 +22,27 @@ public class GitStatusTest {
 	}
 	
 	@Test
+	public void worksWithThisCaseIFound(){
+		// GIVEN
+		GitStatus s = new GitStatus(
+				" M a.txt\n" + 
+				" M b.txt\n" + 
+				" M c.txt\n" + 
+				" M d.txt");
+		
+		// WHEN:
+		List<GitFileStatus> result = s.files();
+		
+		// THEN:
+		Assert.assertNotNull(result);
+		Assert.assertEquals(4, result.size());
+		assertGitFile(null, StatusCode.MODIFY, "a.txt", result.get(0));
+		assertGitFile(null, StatusCode.MODIFY, "b.txt", result.get(1));
+		assertGitFile(null, StatusCode.MODIFY, "c.txt", result.get(2));
+		assertGitFile(null, StatusCode.MODIFY, "d.txt", result.get(3));
+	}
+	
+	@Test
 	public void detectsMixedChanges(){
 		// GIVEN
 		GitStatus s = new GitStatus(

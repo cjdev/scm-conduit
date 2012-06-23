@@ -42,7 +42,7 @@ public class Config {
 		this.publicHostname = publicHostname;
 		this.path = localPath;
 		this.basePathForNewConduits = new File(localPath, "conduits");
-		this.clientIdPrefix = publicHostname + "-conduitServer-";
+		this.clientIdPrefix = publicHostname + "-conduit-server-";
 		this.p4Address = p4Address;
 		this.p4User = p4User;
 	}

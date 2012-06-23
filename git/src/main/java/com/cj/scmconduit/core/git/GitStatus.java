@@ -18,7 +18,7 @@ public class GitStatus {
 			BufferedReader reader = new BufferedReader(new StringReader(text));
 			
 			for(String line = reader.readLine();line!=null;line = reader.readLine()){
-				System.out.println("next line: " + line);
+//				System.out.println("next line: " + line);
 				if(line.startsWith(UNKNOWN_TOKEN)){
 					String file = line.substring(UNKNOWN_TOKEN.length());
 					modifications.add(new GitFileStatus(null, null, file));
@@ -34,17 +34,22 @@ public class GitStatus {
 					String file;
 					
 					if(second.equals(" ") && third.equals(" ")){
-						System.out.println("Detected X__");
+						// PATTERN X__
 						indexOp = first;
 						unstagedOp = null;
 						file = line.substring(3);
+					} else if(first.equals(" ") && !second.equals(" ") && third.equals(" ")){
+						// PATTERN _X_
+						indexOp = null;
+						unstagedOp = second;
+						file = line.substring(3);
 					} else if(third.equals(" ") && !fourth.equals(" ")){
-						System.out.println("Detected X_XX");
+						// PATTERN X_XX
 						indexOp = first;
 						unstagedOp = second;
 						file = line.substring(3);
 					} else if(second.equals(" ") && (!third.equals(" ") && !fourth.equals(" "))){
-						System.out.println("Detected X_XX");
+						// PATTERN X_XX
 						indexOp = first;
 						unstagedOp = null;
 						file = line.substring(2);
@@ -52,21 +57,7 @@ public class GitStatus {
 						throw new RuntimeException("Unable to interpret beginning of line");
 					}
 					
-					System.out.println("Detected '" + indexOp + "' and '" + unstagedOp + "' and file of " + file);
-					
-//					int unstagedCharPos;
-//					String x = Character.valueOf(line.charAt(2)).toString();
-//					System.out.println("x is " + x);
-//					if(x.equals(" ")){
-//						unstagedCharPos = 1;
-//					}else{
-//						unstagedCharPos = 2;
-//					}
-//					
-//					final String unstagedOp = Character.valueOf(line.charAt(unstagedCharPos)).toString();
-//					System.out.println(unstagedOp + " (at pos " + unstagedCharPos + ") is " + unstagedOp);
-					
-//					String file = line.substring(unstagedCharPos+1);;
+//					System.out.println("Detected '" + indexOp + "' and '" + unstagedOp + "' and file of " + file);
 					
 					StatusCode stagedStatus = statusCodeFor(indexOp);
 					StatusCode unStagedStatus = statusCodeFor(unstagedOp);
