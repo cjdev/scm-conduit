@@ -5,7 +5,7 @@ import java.io.OutputStream;
 
 public interface CommandRunner {
 
-	void run(OutputStream sink, InputStream input, String command, String ... args);
+	void run(OutputStream sink, OutputStream errSink, InputStream input, String command, String ... args);
 
 	void runPassThrough(String command, String ... args);
 

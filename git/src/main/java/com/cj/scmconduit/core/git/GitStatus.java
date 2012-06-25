@@ -84,6 +84,8 @@ public class GitStatus {
 			return StatusCode.MODIFY;
 		}else if(id.equals("D")){
 			return StatusCode.RM;
+		}else if(id.equals("U")){
+			return StatusCode.UNMERGED;			
 		} else {
 			throw new RuntimeException("I don't know how to interpret '" + id + "'");
 		}

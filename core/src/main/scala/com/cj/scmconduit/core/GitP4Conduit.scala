@@ -84,7 +84,9 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 
 	override def commit(using:P4Credentials) {}
 	
-	override def rollback() {}
+	override def rollback() {
+		git.run("reset", "--hard");
+	}
 	
 	override def push() {
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
@@ -187,7 +189,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		  case _=>// nothing to do
 		}
 		try{
-			git.run("branch", "-d", "incoming");
+			git.run("branch", "-D", "incoming");
 		}catch{
 		  case _=>// nothing to do
 		}

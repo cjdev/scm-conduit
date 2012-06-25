@@ -10,6 +10,8 @@ import org.junit.{
 }
 import RichFile._
 import org.junit.Assert._
+import com.cj.scmconduit.core.git.GitStatus
+import scala.collection.JavaConversions._
 
 class GitP4ConduitE2ETest {
   
@@ -53,6 +55,78 @@ class GitP4ConduitE2ETest {
 			val localChanges = runGit(shell, branch, "status", "-s")
 			assertEquals("", localChanges)
 			
+		}
+	}
+	
+	
+	@Test
+	def conduitFailsCleanlyWhenIncomingGitChangesResultInMergeConflicts() {
+		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+		  // GIVEN:
+		  
+		  // 1) an existing conduit with some initial history
+			val pathToSallysWorkspace = tempPath("sallysP4")
+			
+			val sallysSpec = createP4Workspace("sally", pathToSallysWorkspace, shell)
+			
+		  	val sallysADotTxt = pathToSallysWorkspace/"README.md" 
+		  	
+		  	sallysADotTxt.delete()
+		  	sallysADotTxt.write("I am a tree")
+			
+		  p4(sallysSpec, shell).doCommand("edit", sallysADotTxt.getAbsolutePath())
+		  p4(sallysSpec, shell).doCommand("submit", "-d", "declared my nature as a tree")
+		  conduit.push();
+		  
+		  // 2) a git clone at that point in the history
+		  
+		  val branch = tempPath("myclone")
+		  shell.run("git", "clone", spec.localPath.getAbsolutePath(), branch.getAbsolutePath())
+		  
+		  // 3) subsequent history in p4
+		  p4(sallysSpec, shell).doCommand("edit", "README.md")
+		  sallysADotTxt.write("I am a pine")
+		  p4(sallysSpec, shell).doCommand("submit", "-d", "clarified my treeishness")
+		  conduit.push();
+		  
+		  def currentRev() = runGit(shell, spec.localPath, "log", "-1", "--format=%H").trim();
+		  
+		  val headBefore = currentRev()
+		  
+		  // 4) conflicting local changes in the clone
+		  
+		  (branch/"README.md").write("I am a bee")
+		  runGit(shell, branch, "add", "README.md")
+		  runGit(shell, branch, "commit", "-m", "I think I'm a bee")
+		  
+		  // WHEN:
+		  // the conduit is asked to push the conflicting history through to perforce
+		  val error = try {
+			  conduit.pull(branch, new P4Credentials("larry", ""))
+			  null
+		  }catch{
+		    case e:Throwable=> {
+		      conduit.rollback()
+		      e
+		    } 
+		  }
+		  
+		  // THEN:
+		  // The request should not succeed
+		  assertNotNull(error)
+		  //    there should be no perforce changes
+		  val p4Changes = p4(sallysSpec, shell).doCommand("sync")
+		  assertEquals("", p4Changes.trim())
+		  
+		  //    there should be no git changes
+		  val filesChanged = new GitStatus(runGit(shell, spec.localPath, "status", "-s")).files().filter{!_.file.equals(".scm-conduit")}
+		  assertEquals(0, filesChanged.size) 
+		  
+		  assertEquals(headBefore, currentRev())
+		  
+		  // The user should receive a useful error message
+		  assertTrue(error.getMessage().contains("Merge conflict in README.md"));
+		  // The conduit should be left in a working state (e.g. subsequent valid push requests from other conduits should work)
 		}
 	}
 	
