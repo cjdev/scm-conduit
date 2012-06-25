@@ -17,17 +17,17 @@ public class P4Impl implements P4 {
 	private final File workspace;
 	private final P4DepotAddress depot;
 	private final P4ClientId client;
-	private final String user;
+	private final P4Credentials credentials;
 	private final String P4_SHELL_COMMAND = "p4";
 	
-	public P4Impl(P4DepotAddress depot, P4ClientId client, String user, File workspace, CommandRunner shell) {
+	public P4Impl(P4DepotAddress depot, P4ClientId client, P4Credentials cred, File workspace, CommandRunner shell) {
 		super();
 		this.depot = depot;
 		this.client = client;
-		this.user = user;
+		this.credentials = cred;
 		this.workspace = workspace;
 		this.shell = shell;
-	}
+	}	
 	
 	@Override
 	public String doCommand(InputStream in, String ... args){
@@ -60,9 +60,14 @@ public class P4Impl implements P4 {
 	
 	private String[] withArgs(String ... args){
 		String[] baseArgs =
-			{"-c", client.toString(), "-d", workspace.getAbsolutePath(), "-p", depot.toString(), "-u", user};
+			{"-c", client.toString(), "-d", workspace.getAbsolutePath(), "-p", depot.toString(), "-u", credentials.user};
+
+		List<String> allArgs = new LinkedList<String>(Arrays.asList(baseArgs));		
+		if (credentials.password != null) {
+			String[] passArgs = {"-P", credentials.password};
+			allArgs.addAll(Arrays.asList(passArgs));
+		}
 		
-		List<String> allArgs = new LinkedList<String>(Arrays.asList(baseArgs));
 		if(args!=null){
 			allArgs.addAll(Arrays.asList(args));
 		}

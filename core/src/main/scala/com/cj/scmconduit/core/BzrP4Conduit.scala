@@ -42,7 +42,7 @@ object BzrP4Conduit {
 			val p4:P4 = new P4Impl(
 					p4Address, 
 					new P4ClientId(spec.clientId),
-					spec.owner,
+					new P4Credentials("", ""),
 					spec.localPath, 
 					shell)
 	  
@@ -96,7 +96,7 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		  new P4Impl(
 					p4Address, 
 					new P4ClientId(s.p4ClientId),
-					state.p4ReadUser,
+					new P4Credentials(state.p4ReadUser, null),
 					conduitPath, 
 					shell)
 	}
@@ -245,7 +245,7 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		new P4Impl(
 				new P4DepotAddress(s.p4Port), 
 				new P4ClientId(s.p4ClientId),
-				using.user,
+				using,
 				conduitPath, 
 				shell);
 	}

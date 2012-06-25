@@ -285,7 +285,7 @@ class GitP4ConduitE2ETest {
 		p
 	}
 	
-	def p4(spec:ClientSpec, shell:CommandRunner)= new P4Impl(new P4DepotAddress("localhost:1666"), new P4ClientId(spec.clientId), spec.owner, spec.localPath, shell);
+	def p4(spec:ClientSpec, shell:CommandRunner)= new P4Impl(new P4DepotAddress("localhost:1666"), new P4ClientId(spec.clientId), new P4Credentials(spec.owner, ""), spec.localPath, shell);
 	
 	def runGit(shell:CommandRunner, dir:LocalPath, args:String*) = {
 	    val gitDir = new LocalPath(dir, ".git") 
@@ -295,7 +295,7 @@ class GitP4ConduitE2ETest {
 	
 	def  createGitConduit(spec:ClientSpec, shell:CommandRunner) = {
 		
-		GitP4Conduit.create(new P4DepotAddress("localhost:1666"), spec, 0, shell, new P4Credentials("whoever", ""))
+		GitP4Conduit.create(new P4DepotAddress("localhost:1666"), spec, 0, shell, new P4Credentials(spec.owner, null))
   
 		println("Starting conduit")
 		val conduit = new GitP4Conduit(spec.localPath, shell)

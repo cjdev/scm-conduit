@@ -79,7 +79,7 @@ class BzrP4ConduitE2ETest {
 		p
 	}
 	
-	def p4(spec:ClientSpec, shell:CommandRunner)= new P4Impl(new P4DepotAddress("localhost:1666"), new P4ClientId(spec.clientId), spec.owner, spec.localPath, shell);
+	def p4(spec:ClientSpec, shell:CommandRunner)= new P4Impl(new P4DepotAddress("localhost:1666"), new P4ClientId(spec.clientId), new P4Credentials(spec.owner, null), spec.localPath, shell);
 	
 	def createConduit(spec:ClientSpec, shell:CommandRunner) = {
 //			println(spec)

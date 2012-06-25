@@ -34,7 +34,7 @@ object GitP4Conduit {
 			val p4:P4 = new P4Impl(
 					p4Address, 
 					new P4ClientId(spec.clientId),
-					spec.owner,
+					credentials,
 					spec.localPath, 
 					shell)
 		    
@@ -57,7 +57,7 @@ object GitP4Conduit {
 				</scm-conduit-state>
 			    )
 			    
-		    if(credentials!=null){
+		    if(credentials !=null){
 				val conduit = new GitP4Conduit(spec.localPath, shell)
 				createDummyInitialP4Commit(spec.localPath, p4, conduit)
 		    }
@@ -76,7 +76,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 			  new P4Impl(
 						new P4DepotAddress(s.p4Port), 
 						new P4ClientId(s.p4ClientId),
-						s.p4ReadUser,
+						new P4Credentials(s.p4ReadUser, null),
 						conduitPath, 
 						shell
 				)
@@ -182,6 +182,17 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		}
 	}
 	
+
+	private def p4ForUser(using:P4Credentials):P4 = {
+		val s = state();
+	    new P4Impl(
+			new P4DepotAddress(s.p4Port), 
+			new P4ClientId(s.p4ClientId),
+			using,
+			conduitPath, 
+			shell);
+	}
+	
 	override def pull(source:String, using:P4Credentials):Boolean = {
 		try{
 			git.run("remote", "rm", "temp");
@@ -215,10 +226,10 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 				System.out.println(log);
 				
 				val changes = new GitRevisionInfo(log);
+				val myp4 = p4ForUser(using)
+				val changeListNum = new Translator(myp4).translate(changes); 
 				
-				val changeListNum = new Translator(p4).translate(changes); 
-				
-				p4.doCommand("submit", "-c", changeListNum.toString());
+				myp4.doCommand("submit", "-c", changeListNum.toString());				  
 			}
 			
 			git.run("update-server-info")
