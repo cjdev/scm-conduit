@@ -229,7 +229,8 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 				val myp4 = p4ForUser(using)
 				val changeListNum = new Translator(myp4).translate(changes); 
 				
-				myp4.doCommand("submit", "-c", changeListNum.toString());				  
+				myp4.doCommand("submit", "-c", changeListNum.toString());		
+				git.run("tag", "cl" + changeListNum.toString())
 			}
 			
 			git.run("update-server-info")

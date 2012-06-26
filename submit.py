@@ -57,6 +57,7 @@ if user != None :
 print "Pushing to " + pushLocation
 
 if os.path.exists(".git"):
+    myScm = "git"
     cmd = "git push " + pushLocation
 elif os.path.exists(".bzr"):
     cmd = "bzr push " + pushLocation
@@ -66,16 +67,18 @@ else:
 os.system(cmd)
 
 while(True):
-  urlParts = urlparse(destinationUri)
-  status = get(urlParts.scheme + "://" + urlParts.netloc + resultLocation)
-  if(status.startswith("WORKING") == True):
-      sys.stdout.write(".")
-      sys.stdout.flush()
-      time.sleep(.25)
-  else:
-      print "done"
-      print status
-      break
+    urlParts = urlparse(destinationUri)
+    status = get(urlParts.scheme + "://" + urlParts.netloc + resultLocation)
+    if(status.startswith("WORKING") == True):
+        sys.stdout.write(".")
+        sys.stdout.flush()
+        time.sleep(.25)
+    else:
+        if myScm == "git":
+            os.system("git fetch --tags")
+        print "done"
+        print status
+        break
 
 
 

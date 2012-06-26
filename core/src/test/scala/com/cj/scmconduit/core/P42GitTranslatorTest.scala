@@ -25,7 +25,8 @@ class P42GitTranslatorTest {
     
     // THEN
     assertEquals(List("add", "-f", where/"fido.dog" getAbsolutePath),result.get(0).toList)
-    assertEquals(List("commit", "--author=sally <sally>", "--date=2012-04-24 11:32:323 +0500", "-m", "[P4 CHANGELIST 23]\nbought a dog"),result.get(1).toList)
+    assertEquals(List("commit", "--author=sally <sally>", "--date=2012-04-24 11:32:323 +0500", "-m", "bought a dog\n\n[lives in perforce as CL#23]"),result.get(1).toList)
+    assertEquals(List("tag", "cl23"), result.get(2).toList)
   }
   
   @Test
@@ -44,7 +45,8 @@ class P42GitTranslatorTest {
     
     // THEN
     assertEquals(List("rm", "dog.txt"),result.get(0).toList)
-    assertEquals(List("commit", "--author=sally <sally>", "--date=2012-04-24 11:32:323 +0500", "-m", "[P4 CHANGELIST 23]\nate the dog"),result.get(1).toList)
+    assertEquals(List("commit", "--author=sally <sally>", "--date=2012-04-24 11:32:323 +0500", "-m", "ate the dog\n\n[lives in perforce as CL#23]"),result.get(1).toList)
+    assertEquals(List("tag", "cl23"), result.get(2).toList)
   }
   
   @Test
@@ -63,7 +65,8 @@ class P42GitTranslatorTest {
     
     // THEN
     assertEquals(List("add", where/"dog.txt" getAbsolutePath),result.get(0).toList)
-    assertEquals(List("commit", "--author=sally <sally>", "--date=2012-04-24 11:32:323 +0500", "-m", "[P4 CHANGELIST 23]\nsurgically implanted a nuclear power source in the dog"),result.get(1).toList)
+    assertEquals(List("commit", "--author=sally <sally>", "--date=2012-04-24 11:32:323 +0500", "-m", "surgically implanted a nuclear power source in the dog\n\n[lives in perforce as CL#23]"),result.get(1).toList)  
+    assertEquals(List("tag", "cl23"), result.get(2).toList)
   }
   
 }

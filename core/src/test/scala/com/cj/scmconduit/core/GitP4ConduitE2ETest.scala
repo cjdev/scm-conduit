@@ -12,6 +12,8 @@ import RichFile._
 import org.junit.Assert._
 import com.cj.scmconduit.core.git.GitStatus
 import scala.collection.JavaConversions._
+import org.apache.commons.io.FileUtils
+import java.io.File
 
 class GitP4ConduitE2ETest {
   
@@ -135,17 +137,17 @@ class GitP4ConduitE2ETest {
 		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
 		  	
 			// GIVEN: A new conduit connected to a depot with an empty history, and a git branch with one change
-			val branch = tempPath("myclone")
-			shell.run("git", "clone", spec.localPath, branch)
-			val newFile = branch / "file.txt"
+			val myclone = tempPath("myclone")
+			shell.run("git", "clone", spec.localPath, myclone)
+			val newFile = myclone / "file.txt"
 			newFile.write("hello world")
-			runGit(shell, branch, "add", ".")
-			runGit(shell, branch, "commit", "-m", "Added_file.txt")
+			runGit(shell, myclone, "add", ".")
+			runGit(shell, myclone, "commit", "-m", "Added_file.txt")
 			
 			val haveBefore = p4(spec, shell).doCommand("have")
 			
 			// when: the change is submitted to the conduit
-			val changesFlowed = conduit.pull(branch, new P4Credentials("larry", ""))
+			val changesFlowed = conduit.pull(myclone, new P4Credentials("larry", ""))
 			
 			// then: 
 			assertTrue("Some changes should make their way to perforce", changesFlowed)
@@ -161,10 +163,23 @@ class GitP4ConduitE2ETest {
 			assertTrue("The client should have the files", haveAfter.contains("//depot/file.txt#1"))
 			
 			// there should be no git changes
-			val gitChanges = runGit(shell, branch, "status", "-s")
+			val gitChanges = runGit(shell, myclone, "status", "-s")
 			assertEquals("", gitChanges)
 			
+			println(runGit(shell, myclone, "fetch", "--tags")) // synchronize tags with remote git conduit
+			val taggedRev = toString(new File(myclone, ".git/refs/tags/cl2")).trim()
+		  	val currentRev = runGit(shell, myclone, "log", "-1", "--format=%H").trim()
+		  	
+		  	assertEquals(currentRev, taggedRev)
 		}
+	}
+	
+	private def toString(f:File) = {
+	    if(f.exists){
+	      FileUtils.readFileToString(f)
+	    }else{
+	      ""
+	    }
 	}
 	
 	@Test

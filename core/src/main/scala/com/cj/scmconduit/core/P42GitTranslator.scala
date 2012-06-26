@@ -60,7 +60,12 @@ class P42GitTranslator (private val conduitPath:File) {
 				"--author=" + nextChange.whoString() + " <" + nextChange.whoString() + ">",
 				"--date=" + toBzrCommitDateFormat(nextChange.getWhen(), p4TimeZoneOffset),
 				//"--allow-empty",
-				"-m", "[P4 CHANGELIST " + nextChange.id() + "]\n" + nextChange.description()));
+				"-m",
+				nextChange.description() + "\n\n" + "[lives in perforce as CL#" + nextChange.id() + "]"));
+		
+		gitCommands.add(asList(
+				"tag",
+				"cl" + nextChange.id()));
 		
 		return gitCommands;
 	}
