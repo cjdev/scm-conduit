@@ -101,14 +101,6 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 					shell)
 	}
 
-//	def initializeEmpty(using:P4Credentials) = {
-//	  val firstFile = conduitPath/"firstFile.txt"
-//	  firstFile.write("hello world")
-//	  runBzr("add", firstFile.get)
-//	  
-//	  sendPendingBzrChangesToPerforce(using)
-//	}
-//	
 	override def push() { 
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
 
