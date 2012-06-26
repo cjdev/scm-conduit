@@ -21,8 +21,6 @@ class P42GitTranslator (private val conduitPath:File) {
 	def translate(nextChange:P4Changelist, changes:List[Change], p4TimeZoneOffset:Int):List[List[String]] = {
 		val gitCommands = new ArrayList[List[String]]();
 		
-		
-
 		val adds = new LinkedList[Change]();
 		
 		changes.foreach{next=>
@@ -31,7 +29,7 @@ class P42GitTranslator (private val conduitPath:File) {
 			changeType match {
 			case ChangeType.ADD => adds.add(next);
 			case ChangeType.DELETE => gitCommands.add(asList("rm", relativePathFor(next.workspacePath)));
-			case ChangeType.UPDATE => gitCommands.add(asList("add", next.workspacePath));
+			case ChangeType.UPDATE => gitCommands.add(asList("add", relativePathFor(next.workspacePath)));
 			case _=> throw new RuntimeException("Not sure what to do with " + changeType);
 			}
 		}
@@ -46,7 +44,7 @@ class P42GitTranslator (private val conduitPath:File) {
 				group.foreach{add=>
 					val branchPath = add.workspacePath
 					assertIsConduitFile(branchPath)
-					args.add(branchPath)
+					args.add(relativePathFor(branchPath))
 				}
 				
 				gitCommands.add(args)
