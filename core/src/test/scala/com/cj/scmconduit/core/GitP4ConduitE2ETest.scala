@@ -29,6 +29,21 @@ class GitP4ConduitE2ETest {
     	dir = dir.getParentFile()
     }
   }
+  
+//  
+//  @Test
+//  def failsCleanlyWhenUserAccountIsNotSetup(){
+//	runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+//	  // GIVEN:
+//	  
+//	  // WHEN:
+//	  
+//	  // THEN:
+//	  
+//	}
+//  }
+  
+  
 	@Test
 	def returnsFalseWhenThereIsNothingToPush() {
 		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
