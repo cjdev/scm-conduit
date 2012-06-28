@@ -134,6 +134,6 @@ if __name__ == "__main__":
             time.sleep(0.25)
         else:
             if scm == "git":
-                os.system("get fetch --tags")
+                os.system("git fetch --tags")
                 print(status + "\n")
                 exit_with("DONE")
