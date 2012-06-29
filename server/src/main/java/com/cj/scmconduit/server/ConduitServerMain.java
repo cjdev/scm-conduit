@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -21,6 +22,7 @@ import org.httpobjects.HttpObject;
 import org.httpobjects.Request;
 import org.httpobjects.Response;
 import org.httpobjects.jetty.HttpObjectsJettyHandler;
+import org.httpobjects.util.ClasspathResourceObject;
 import org.httpobjects.util.HttpObjectUtil;
 import org.httpobjects.util.Method;
 import org.mortbay.jetty.Handler;
@@ -141,39 +143,6 @@ public class ConduitServerMain {
 		// Add shared bzr repository
 		root.addVResource("/.bzr", new File(config.path, ".bzr"));
 		
-		HttpObject mainPage = new HttpObject("/"){
-			@Override
-			public Response get(Request req) {
-				StringBuilder text = new StringBuilder();
-				text.append("<html><body>");
-				
-				text.append("<form action=\"/admin\"><input type=\"submit\" value=\"Add Conduit\"/></form><hr/>");
-				SortedSet<String> paths = new TreeSet<String>();
-
-				for(ConduitStuff conduit: conduits){
-					paths.add(conduit.p4path);
-				}
-				
-				for(String path: paths){
-					List<ConduitStuff> atPath = new ArrayList<ConduitServerMain.ConduitStuff>();
-					for(ConduitStuff conduit: conduits){
-						if(conduit.p4path.equals(path)){
-							atPath.add(conduit);
-						}
-					}
-					text.append("<div>" + path + "<div><ul>");
-					
-					for(ConduitStuff conduit: atPath){
-						final String url = basePublicUrl + conduit.config.hostingPath + (new File(conduit.config.localPath, ".git").exists()?"/.git":"");
-						text.append("<li><a href=\"" + url + "\">" + url + "</a></li>");
-					}
-					text.append("</ul></div></div>");
-					
-				}
-				text.append("</body></html>");
-				return OK(Html(text.toString()));
-			}
-		};
 		HttpObject addConduitPage = new AddConduitResource(new AddConduitResource.Listener() {
 			
 			@Override
@@ -249,8 +218,31 @@ public class ConduitServerMain {
 				return relay(req, Method.POST);
 			}
 		};
-
-		handlers.add(new HttpObjectsJettyHandler(mainPage, addConduitPage, depotHandler));
+		
+		final HttpObject conduitsApiResource = new HttpObject("/api/conduits"){
+			@Override
+			public Response get(Request req) {
+				StringBuilder text = new StringBuilder("{\"conduits\":[");
+				
+				for(int x=0;x<conduits.size();x++){
+					final ConduitStuff conduit = conduits.get(x);
+					final String url = basePublicUrl + conduit.config.hostingPath + (new File(conduit.config.localPath, ".git").exists()?"/.git":"");
+					
+					text.append(
+							"{" +
+							"    \"p4path\":\""  + conduit.p4path + "\"," +
+							"    \"url\":\"" + url + "\"" + 
+							"}");
+					if(x>0) text.append(",");
+					
+				}
+				text.append("]}");
+				
+				return OK(Json(text.toString()));
+			}
+		};
+		
+		handlers.add(new HttpObjectsJettyHandler(new ClasspathResourceObject("/", "index.html", getClass()), addConduitPage, depotHandler, conduitsApiResource));
 		
 		jetty.setHandlers(handlers.toArray(new Handler[]{}));
 		jetty.start();

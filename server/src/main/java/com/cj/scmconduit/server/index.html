@@ -1,0 +1,64 @@
+<html>
+<head>
+<script type="text/javascript" src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
+<style type="text/css">
+#header {
+	font-size:24pt;
+	border-bottom: 2px solid grey;
+}
+div.conduitbox {
+	margin:5px;
+	background:#eeeeee;
+	padding:10px;
+}
+div.conduitLabel {
+	font-size:14pt;
+	font-weight:bold;
+	font-style:italic;
+	width:100%;
+}
+td.label {
+	text-align:right;
+}
+</style>
+</head>
+<body>
+<!-- <div style="text-align:right;">spenrose@p4cj.vclk.net [<a href="account">logout</a>]<div style="clear:both;"></div></div>-->
+<div id="header">scm-conduit-server<button style="margin:5px;float:right;clear:both;">Add</button></div>
+
+
+<div id="whatever"/>
+
+
+<script>
+$(function(){
+	
+	$.get("/api/conduits", function(result){
+		$.each(result.conduits, function(){
+			var conduit = this;
+			
+			$("#whatever").append('<div class="conduitbox">' + 
+			'<div class="conduitLabel">cjo ' + 
+			///'<span style="font-size:10pt;font-weight:normal;font-style:italic;">[STATUS:OK]' + 
+			'</div>' + 
+			'<table>' + 
+			//'	<tr><td class="label">Type:</td><td>git</td></tr>' + 
+			'	<tr><td class="label">Perforce Path:</td><td>' + conduit.p4path + '</td></tr>' + 
+			//'	<tr><td class="label">API:</td><td>http://build115.wl.cj.com:8034/cjo</td></tr>' + 
+			'	<tr><td class="label">Read-Only:</td><td>http://build115.wl.cj.com:8034/cjo/.git</td></tr>' + 
+			//'	<tr><td class="label">Read/Write:</td><td>ssh://build115.wl.cj.com:3433/</td></tr>' + 
+			'</table>' + 
+			'</div>');
+			//append(conduit.p4path);
+			
+			
+		});
+	});
+	
+	$("button").click(function(){
+		document.location = "/admin";
+	});
+});
+</script>
+</body>
+</html>
