@@ -227,13 +227,14 @@ public class ConduitServerMain {
 				for(int x=0;x<conduits.size();x++){
 					final ConduitStuff conduit = conduits.get(x);
 					final String url = basePublicUrl + conduit.config.hostingPath + (new File(conduit.config.localPath, ".git").exists()?"/.git":"");
-					
+
+					if(x>0) text.append(",");
 					text.append(
 							"{" +
+							"    \"name\":\""  + conduit.config.localPath.getName() + "\"," +
 							"    \"p4path\":\""  + conduit.p4path + "\"," +
 							"    \"url\":\"" + url + "\"" + 
 							"}");
-					if(x>0) text.append(",");
 					
 				}
 				text.append("]}");
