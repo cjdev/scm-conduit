@@ -243,7 +243,13 @@ public class ConduitServerMain {
 			}
 		};
 		
-		handlers.add(new HttpObjectsJettyHandler(new ClasspathResourceObject("/", "index.html", getClass()), addConduitPage, depotHandler, conduitsApiResource));
+		handlers.add(new HttpObjectsJettyHandler(
+							new ClasspathResourceObject("/", "index.html", getClass()), 
+							new ClasspathResourceObject("/submit.py", "submit.py", getClass()), 
+							addConduitPage, 
+							depotHandler, 
+							conduitsApiResource
+							));
 		
 		jetty.setHandlers(handlers.toArray(new Handler[]{}));
 		jetty.start();
