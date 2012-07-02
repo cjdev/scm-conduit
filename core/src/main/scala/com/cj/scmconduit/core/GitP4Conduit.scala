@@ -238,6 +238,8 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 					  throw e
 				  }
 				}
+				
+				push()
 			}
 			
 			git.run("update-server-info")
