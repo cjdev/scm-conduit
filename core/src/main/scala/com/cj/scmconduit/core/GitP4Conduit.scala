@@ -94,7 +94,11 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	override def delete(){
 		val s = state();
 		p4.doCommand("workspace", "-d", s.getP4ClientId())
-  		FileUtils.deleteDirectory(conduitPath);
+		try{
+			FileUtils.deleteDirectory(conduitPath);
+		}catch{
+		  case _ => shell.run("rm", "-rf", conduitPath.getAbsolutePath())
+		}
 	}
 	
 	override def push() {
