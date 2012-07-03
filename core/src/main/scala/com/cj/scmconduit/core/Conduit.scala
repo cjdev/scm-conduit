@@ -8,4 +8,6 @@ trait Conduit {
 	def rollback()
 	def push() 
 	def p4Path():String
+	def backlogSize():Int
+	def currentP4Changelist():Long
 }

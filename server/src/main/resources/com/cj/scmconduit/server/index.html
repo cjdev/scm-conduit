@@ -20,33 +20,41 @@ div.conduitLabel {
 td.label {
 	text-align:right;
 }
+span.error {
+	color:red;
+}
 </style>
 </head>
 <body>
-<!-- <div style="text-align:right;">spenrose@p4cj.vclk.net [<a href="account">logout</a>]<div style="clear:both;"></div></div>-->
+<!-- <div style="text-align:right;">spenrose@p4cj.vclk.net [<a href="account">logout</a>]<div style="clear:both;"></div></div> -->
 <div id="header">scm-conduit-server<button style="margin:5px;float:right;clear:both;">Add</button></div>
 
-
 <div id="whatever"></div>
-
 
 <script>
 $(function(){
 	
 	$.get("/api/conduits", function(result){
+		
 		$.each(result.conduits, function(){
 			var conduit = this;
 			
+			var classes = "";
+			
+			if(conduit.status === "ERROR"){
+				classes += " error";
+			}
+			
 			$("#whatever").append('<div class="conduitbox">' + 
 			'<div class="conduitLabel">' + conduit.name + 
-			///'<span style="font-size:10pt;font-weight:normal;font-style:italic;">[STATUS:OK]' + 
+			'<span class="' + classes + '" style="font-size:10pt;font-weight:normal;font-style:italic;"> [STATUS:' + conduit.status + ']' + 
 			'</div>' + 
 			'<table>' + 
-			//'	<tr><td class="label">Type:</td><td>git</td></tr>' + 
+			'	<tr><td class="label">Type:</td><td>git</td></tr>' + 
 			'	<tr><td class="label">Perforce Path:</td><td>' + conduit.p4path + '</td></tr>' + 
 			'	<tr><td class="label">API:</td><td>' + conduit.apiUrl + '</td></tr>' + 
 			'	<tr><td class="label">Read-Only:</td><td>' + conduit.readOnlyUrl + '</td></tr>' + 
-			//'	<tr><td class="label">Read/Write:</td><td>ssh://build115.wl.cj.com:3433/</td></tr>' + 
+// 			'	<tr><td class="label">Read/Write:</td><td>ssh://build115.wl.cj.com:3433/</td></tr>' + 
 			'</table>' + 
 			'</div>');
 			//append(conduit.p4path);

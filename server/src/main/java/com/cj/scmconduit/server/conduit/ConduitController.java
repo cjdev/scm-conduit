@@ -34,6 +34,7 @@ public class ConduitController implements Pusher {
 	private final PushStrategy pushStrategy;
 	private final Map<Integer, PushSession> pushes = new HashMap<Integer, PushSession>();
 	private final TempDirAllocator temps;
+	private ConduitState state = ConduitState.IDLE;
 	
 	public ConduitController(URI publicUri, File pathOnDisk, TempDirAllocator temps) {
 		super();
@@ -52,6 +53,22 @@ public class ConduitController implements Pusher {
 		}else{
 			throw new RuntimeException("Not sure what kind of conduit this is: " + pathOnDisk);
 		}
+	}
+	
+	public ConduitState state() {
+		return state;
+	}
+	
+	public int queueLength(){
+		return requests.size();
+	}
+	
+	public int backlogSize(){
+		return conduit.backlogSize();
+	}
+	
+	public Long currentP4Changelist(){
+		return conduit.currentP4Changelist();
 	}
 	
 	public String p4Path(){
@@ -112,19 +129,24 @@ public class ConduitController implements Pusher {
 			public void run() {
 				while(true){
 					try {
+						state = ConduitState.POLLING;
 						pumpIn();
 						PushRequest request = popNextRequest();
 						if(request!=null){
+							state = ConduitState.SENDING;
 							log.info("Handling request: " + request);
 							handle(request);
 						}else{
 							log.info("Sleeping");
+							state = ConduitState.IDLE;
 							Thread.sleep(5000);
 						}
 
 					} catch (Exception e) {
 						log.info("ERROR IN CONDUIT " + pathOnDisk + "\n" + stackTrace(e));
 						log.error("Error in conduit" + pathOnDisk, e);
+						state = ConduitState.ERROR;
+						break;
 					}
 				}
 			}

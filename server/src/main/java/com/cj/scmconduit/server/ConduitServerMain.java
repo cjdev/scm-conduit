@@ -5,14 +5,11 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.BasicConfigurator;
@@ -21,6 +18,7 @@ import org.apache.log4j.Logger;
 import org.httpobjects.HttpObject;
 import org.httpobjects.Request;
 import org.httpobjects.Response;
+import org.httpobjects.jackson.JacksonDSL;
 import org.httpobjects.jetty.HttpObjectsJettyHandler;
 import org.httpobjects.util.ClasspathResourceObject;
 import org.httpobjects.util.HttpObjectUtil;
@@ -29,18 +27,24 @@ import org.mortbay.jetty.Handler;
 import org.mortbay.jetty.Server;
 import org.mortbay.jetty.handler.ResourceHandler;
 
+import scala.Function1;
 import scala.Tuple2;
+import scala.runtime.AbstractFunction1;
+import scala.runtime.BoxedUnit;
 
 import com.cj.scmconduit.core.BzrP4Conduit;
 import com.cj.scmconduit.core.GitP4Conduit;
+import com.cj.scmconduit.core.Conduit;
 import com.cj.scmconduit.core.p4.ClientSpec;
 import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.p4.P4DepotAddress;
 import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.core.util.CommandRunnerImpl;
 import com.cj.scmconduit.server.conduit.ConduitController;
+import com.cj.scmconduit.server.conduit.ConduitState;
 import com.cj.scmconduit.server.config.Config;
 import com.cj.scmconduit.server.fs.TempDirAllocator;
+import com.cj.scmconduit.server.fs.TempDirAllocatorImpl;
 import com.cj.scmconduit.server.jetty.ConduitHandler;
 import com.cj.scmconduit.server.jetty.VFSResource;
 
@@ -88,6 +92,11 @@ public class ConduitServerMain {
 	{
 		credentials.put("someuser", "test");
 	}
+	private final String basePublicUrl;
+	private final P4DepotAddress p4Address;
+	private final TempDirAllocator allocator;
+	private final List<ConduitStuff> conduits = new ArrayList<ConduitServerMain.ConduitStuff>();
+	private final List<ConduitCreationThread> creationThreads = new ArrayList<ConduitServerMain.ConduitCreationThread>();
 	
 	public ConduitServerMain(final Config config) throws Exception {
 		this.path = config.path;
@@ -96,10 +105,10 @@ public class ConduitServerMain {
 			throw new IOException("Directory does not exist: " + this.tempDirPath);
 		}
 		
-		final String basePublicUrl = "http://" + config.publicHostname + ":8034";
+		basePublicUrl = "http://" + config.publicHostname + ":8034";
 		System.out.println("My public url is " + basePublicUrl);
 		
-		final P4DepotAddress p4Address = new P4DepotAddress(config.p4Address);
+		p4Address = new P4DepotAddress(config.p4Address);
 		
 		jetty = new Server(8034);
 		ResourceHandler defaultHandler = new ResourceHandler();
@@ -109,32 +118,8 @@ public class ConduitServerMain {
 		final List<Handler> handlers = new ArrayList<Handler>();
 		handlers.add(defaultHandler);
 		
-		final TempDirAllocator allocator = new TempDirAllocator() {
-			private Set<File> allocatedPaths = new HashSet<File>();
-			public File newTempDir() {
-				try {
-					File path = File.createTempFile("conduit-server", ".dir", tempDirPath);
-					if(!path.delete() & !path.mkdirs()){
-						throw new RuntimeException("Could not create directory at path " + tempDirPath.getAbsolutePath());
-					}
-					return path;
-				} catch (IOException e) {
-					throw new RuntimeException("Error creating temp dir at " + tempDirPath, e);
-				}
-			}
-			public void dispose(File tempDir) {
-				if(!allocatedPaths.contains(tempDir))
-					throw new RuntimeException("This is not something I allocated");
-				
-				try {
-					FileUtils.deleteDirectory(tempDir);
-				} catch (IOException e) {
-					throw new RuntimeException("Could not delete directory:" + tempDir.getAbsolutePath());
-				}
-			}
-		};
+		allocator = new TempDirAllocatorImpl(tempDirPath);
 		
-		final List<ConduitStuff> conduits = new ArrayList<ConduitServerMain.ConduitStuff>();
 		for(ConduitConfig conduit: findConduits()){
 			ConduitStuff stuff = prepareConduit(basePublicUrl, root, allocator, conduit);
 			conduits.add(stuff);
@@ -144,42 +129,11 @@ public class ConduitServerMain {
 		root.addVResource("/.bzr", new File(config.path, ".bzr"));
 		
 		HttpObject addConduitPage = new AddConduitResource(new AddConduitResource.Listener() {
-			
 			@Override
-			public void addConduit(ConduitType type, String name, String p4Path, Integer p4FirstCL) {
-				final CommandRunner shell = new CommandRunnerImpl();
-				File localPath = new File(config.basePathForNewConduits, name);
-				System.out.println("I am going to create something at " + localPath);
-				if(localPath.exists()) throw new RuntimeException("There is already a conduit called \"" + name + "\" " +
-						"(given that there is already a directory at " + localPath.getAbsolutePath() + ")");
-				
-				String clientId = config.clientIdPrefix + name;
-				
-				@SuppressWarnings("deprecation")
-				scala.collection.immutable.List<Tuple2<String, String>> view = scala.collection.immutable.List.fromArray(new Tuple2[]{
-						new Tuple2<String, String>(p4Path + "/...", "/...")
-				});
-				
-				ClientSpec spec = new ClientSpec(
-									localPath, 
-									config.p4User, 
-									clientId, 
-									config.publicHostname, 
-									view);
-				
-				P4Credentials credentials = new P4Credentials(config.p4User, "");
-				
-				if(type == ConduitType.GIT){
-					GitP4Conduit.create(p4Address, spec, p4FirstCL, shell, credentials);
-				}else if(type == ConduitType.BZR){
-					BzrP4Conduit.create(p4Address, spec, p4FirstCL, shell, credentials);
-				}else{
-					throw new RuntimeException("not sure how to create a \"" + type + "\" conduit");
-				}
-				
-				ConduitConfig conduit = new ConduitConfig("/" + name, localPath);
-				ConduitStuff stuff = prepareConduit(basePublicUrl, root, allocator, conduit);
-				conduits.add(stuff);
+			public void addConduit(final ConduitType type, final String name, final String p4Path, final Integer p4FirstCL) {
+				ConduitCreationThread thread = new ConduitCreationThread(config, type, name, p4Path, p4FirstCL, root);
+				creationThreads.add(thread);
+				thread.start();
 			}
 		});
 		
@@ -222,26 +176,37 @@ public class ConduitServerMain {
 		final HttpObject conduitsApiResource = new HttpObject("/api/conduits"){
 			@Override
 			public Response get(Request req) {
-				StringBuilder text = new StringBuilder("{\"conduits\":[");
+				ConduitsDto conduitsDto = new ConduitsDto();
 				
 				for(int x=0;x<conduits.size();x++){
 					final ConduitStuff conduit = conduits.get(x);
-					final String url = basePublicUrl + conduit.config.hostingPath + (new File(conduit.config.localPath, ".git").exists()?"/.git":"");
-					final String apiUrl = basePublicUrl + conduit.config.hostingPath;
-					
-					if(x>0) text.append(",");
-					text.append(
-							"{" +
-							"    \"name\":\""  + conduit.config.localPath.getName() + "\"," +
-							"    \"p4path\":\""  + conduit.p4path + "\"," +
-							"    \"readOnlyUrl\":\"" + url + "\"," + 
-							"    \"apiUrl\":\"" + apiUrl + "\"" + 
-							"}");
-					
+					final ConduitInfoDto dto = new ConduitInfoDto();
+					dto.readOnlyUrl = basePublicUrl + conduit.config.hostingPath + (new File(conduit.config.localPath, ".git").exists()?"/.git":"");
+					dto.apiUrl = basePublicUrl + conduit.config.hostingPath;
+					dto.p4path = conduit.p4path;
+					dto.name = conduit.config.localPath.getName();
+					dto.queueLength = conduit.controller.queueLength();
+					dto.status = conduit.controller.state();
+					dto.backlogSize = conduit.controller.backlogSize();
+					dto.currentP4Changelist = conduit.controller.currentP4Changelist();
+					conduitsDto.conduits.add(dto);
 				}
-				text.append("]}");
 				
-				return OK(Json(text.toString()));
+				for(ConduitCreationThread next : creationThreads){
+					ConduitInfoDto dto = new ConduitInfoDto();
+					dto.name = next.name;
+					if(next.theConduit==null){
+						dto.status = ConduitState.STARTING;
+					}else{
+						dto.status = ConduitState.BUILDING;
+						dto.backlogSize = next.theConduit.backlogSize();
+						dto.currentP4Changelist = next.theConduit.currentP4Changelist();
+					}
+					
+					conduitsDto.conduits.add(dto);
+				}
+				
+				return OK(JacksonDSL.JacksonJson(conduitsDto));
 			}
 		};
 		
@@ -256,6 +221,90 @@ public class ConduitServerMain {
 		jetty.setHandlers(handlers.toArray(new Handler[]{}));
 		jetty.start();
 		
+	}
+	
+
+	static class ConduitsDto {
+		public List<ConduitInfoDto> conduits = new ArrayList<ConduitServerMain.ConduitInfoDto>();
+	}
+	
+	static class ConduitInfoDto {
+		public String name, p4path, readOnlyUrl, apiUrl;
+		public ConduitState status;
+		public Integer queueLength;
+		public Integer backlogSize;
+		public Long currentP4Changelist;
+		
+		public ConduitInfoDto() {
+		}
+
+	}
+	
+	class ConduitCreationThread extends Thread {
+		final Config config;
+		final ConduitType type;
+		final String name;
+		final String p4Path;
+		final Integer p4FirstCL;
+		final VFSResource root;
+		Conduit theConduit;
+		
+		private ConduitCreationThread(Config config, ConduitType type,
+				String name, String p4Path, Integer p4FirstCL, VFSResource root) {
+			super();
+			this.config = config;
+			this.type = type;
+			this.name = name;
+			this.p4Path = p4Path;
+			this.p4FirstCL = p4FirstCL;
+			this.root = root;
+		}
+
+		public void run() {
+			
+			final CommandRunner shell = new CommandRunnerImpl();
+			File localPath = new File(config.basePathForNewConduits, name);
+			System.out.println("I am going to create something at " + localPath);
+			if(localPath.exists()) throw new RuntimeException("There is already a conduit called \"" + name + "\" " +
+					"(given that there is already a directory at " + localPath.getAbsolutePath() + ")");
+			
+			String clientId = config.clientIdPrefix + name;
+			
+			@SuppressWarnings("deprecation")
+			scala.collection.immutable.List<Tuple2<String, String>> view = scala.collection.immutable.List.fromArray(new Tuple2[]{
+					new Tuple2<String, String>(p4Path + "/...", "/...")
+			});
+			
+			ClientSpec spec = new ClientSpec(
+								localPath, 
+								config.p4User, 
+								clientId, 
+								config.publicHostname, 
+								view);
+			
+			P4Credentials credentials = new P4Credentials(config.p4User, "");
+			
+			Function1<Conduit, BoxedUnit> observerFunction = new AbstractFunction1<Conduit, BoxedUnit>(){
+				@Override
+				public BoxedUnit apply(Conduit arg0) {
+					theConduit = arg0;
+					return BoxedUnit.UNIT;
+				}
+			};
+			
+			if(type == ConduitType.GIT){
+				GitP4Conduit.create(p4Address, spec, p4FirstCL, shell, credentials, observerFunction);
+			}else if(type == ConduitType.BZR){
+				BzrP4Conduit.create(p4Address, spec, p4FirstCL, shell, credentials, observerFunction);
+			}else{
+				throw new RuntimeException("not sure how to create a \"" + type + "\" conduit");
+			}
+			
+			ConduitConfig conduit = new ConduitConfig("/" + name, localPath);
+			ConduitStuff stuff = prepareConduit(basePublicUrl, root, allocator, conduit);
+			conduits.add(stuff);
+			creationThreads.remove(this);
+		}
 	}
 	
 	interface MethodInvoker {

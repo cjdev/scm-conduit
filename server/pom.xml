@@ -66,6 +66,21 @@
 			<artifactId>httpobjects-jetty</artifactId>
 			<version>0.0.1-SNAPSHOT</version>
 	    </dependency>
+	    <dependency>
+			<groupId>org.httpobjects.jackson</groupId>
+			<artifactId>httpobjects-jackson</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+        <dependency>
+			<groupId>org.codehaus.jackson</groupId>
+			<artifactId>jackson-core-asl</artifactId>
+			<version>1.8.3</version>
+		</dependency>
+		<dependency>
+			<groupId>org.codehaus.jackson</groupId>
+			<artifactId>jackson-mapper-asl</artifactId>
+			<version>1.8.3</version>
+		</dependency>
 		<dependency>
 	      <groupId>commons-logging</groupId>
 	      <artifactId>commons-logging</artifactId>
@@ -87,7 +102,7 @@
 			<groupId>javax.xml.bind</groupId>
 			<artifactId>jaxb-api</artifactId>
 			<version>2.2.1</version>
-			<scope>provided</scope>
+			<scope>provided</scope> 
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>

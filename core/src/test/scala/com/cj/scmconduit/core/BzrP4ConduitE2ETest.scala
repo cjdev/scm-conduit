@@ -101,7 +101,7 @@ class BzrP4ConduitE2ETest {
 			
 			if(!spec.localPath.exists && !spec.localPath.mkdirs()) throw new Exception("Could not create directory: " + spec.localPath)
 	  
-			BzrP4Conduit.create(new P4DepotAddress("localhost:1666"), spec, 0, shell)
+			BzrP4Conduit.create(new P4DepotAddress("localhost:1666"), spec, 0, shell, new P4Credentials(spec.owner, null))
 			
 			var pathToDirHintFile = spec.localPath/".p4-directory" 
 			pathToDirHintFile.write("this file tells perforce that this is a directory")

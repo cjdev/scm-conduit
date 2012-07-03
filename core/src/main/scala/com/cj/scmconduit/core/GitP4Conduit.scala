@@ -28,7 +28,7 @@ import com.cj.scmconduit.core.git.Git
 
 object GitP4Conduit {
   
-	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials = null) {
+	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials, observer:(Conduit)=>Unit = {c=>}) {
 		    spec.localPath.mkdirs()
 		    
 			val p4:P4 = new P4Impl(
@@ -57,12 +57,10 @@ object GitP4Conduit {
 				</scm-conduit-state>
 			    )
 			    
-		    if(credentials !=null){
-				val conduit = new GitP4Conduit(spec.localPath, shell)
-				createDummyInitialP4Commit(spec.localPath, p4, conduit)
-		    }
+			val conduit = new GitP4Conduit(spec.localPath, shell)
+			observer(conduit);
+			createDummyInitialP4Commit(spec.localPath, p4, conduit)
 			    
-			git.run("update-server-info")
 	}
 	
 }
@@ -88,6 +86,11 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		git.run("reset", "--hard");
 	}
 	
+	
+	var backlogSize:Int = 0;
+	
+	override def currentP4Changelist() = state().getLastSyncedP4Changelist();
+	
 	override def push() {
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
 
@@ -95,7 +98,9 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		while(keepPumping){
 			val lastSync = findLastSyncRevision();
 			val newStuff = findDepotChangesSince(lastSync);
-
+			
+			backlogSize = newStuff.size()
+			
 			if(newStuff.isEmpty()){
 				keepPumping = false;
 			}else{

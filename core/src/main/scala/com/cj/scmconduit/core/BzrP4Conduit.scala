@@ -38,7 +38,7 @@ object BzrP4Conduit {
 		);
 	}
 	
-	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials = null){
+	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials, observer:(Conduit)=>Unit = {c=>}) {
 			val p4:P4 = new P4Impl(
 					p4Address, 
 					new P4ClientId(spec.clientId),
@@ -66,20 +66,11 @@ object BzrP4Conduit {
 					<p4-client-id>{spec.clientId}</p4-client-id>
 				</scm-conduit-state>
 			    )
-			
-			if(credentials!=null){
-				val conduit = new BzrP4Conduit(spec.localPath, shell)
-				
-				createDummyInitialP4Commit(spec.localPath, p4, conduit)
-//				if(spec.localPath.listFiles().filter(!_.getName().startsWith(".")).isEmpty){
-//				  val firstFile = spec.localPath/"firstFile.txt"
-//				  firstFile.write("hello world")
-//				  p4.doCommand("add", "firstFile.txt")
-//				  p4.doCommand("submit", "-d", "first change")
-//				  p4.syncTo(P4RevSpec.forChangelist(0))
-//				  conduit.push()
-//				}
-			}
+			    
+           val conduit = new BzrP4Conduit(spec.localPath, shell)
+           observer(conduit);
+           createDummyInitialP4Commit(spec.localPath, p4, conduit)
+
 	}
 }
 
@@ -101,6 +92,11 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 					shell)
 	}
 
+	override def backlogSize():Int = 0
+	
+	override def currentP4Changelist() = state().getLastSyncedP4Changelist();
+
+	
 	override def push() { 
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
 
