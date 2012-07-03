@@ -43,6 +43,9 @@ import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.p4.P4DepotAddress;
 import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.core.util.CommandRunnerImpl;
+import com.cj.scmconduit.server.api.ConduitInfoDto;
+import com.cj.scmconduit.server.api.ConduitType;
+import com.cj.scmconduit.server.api.ConduitsDto;
 import com.cj.scmconduit.server.conduit.ConduitController;
 import com.cj.scmconduit.server.conduit.ConduitState;
 import com.cj.scmconduit.server.config.Config;
@@ -269,23 +272,6 @@ public class ConduitServerMain {
 	}
 	
 
-	static class ConduitsDto {
-		public List<ConduitInfoDto> conduits = new ArrayList<ConduitServerMain.ConduitInfoDto>();
-	}
-	
-	static class ConduitInfoDto {
-		public String name, p4path, readOnlyUrl, apiUrl;
-		public ConduitState status;
-		public Integer queueLength;
-		public Integer backlogSize;
-		public Long currentP4Changelist;
-		public String error;
-		
-		public ConduitInfoDto() {
-		}
-
-	}
-	
 	class ConduitCreationThread extends Thread {
 		final Config config;
 		final ConduitType type;
@@ -427,6 +413,8 @@ public class ConduitServerMain {
 			dto.backlogSize = conduit.controller.backlogSize();
 			dto.currentP4Changelist = conduit.controller.currentP4Changelist();
 			dto.error = conduit.controller.error();
+			dto.type = conduit.controller.type();
+			
 			return dto;
 		}
 	}

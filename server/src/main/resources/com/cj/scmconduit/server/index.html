@@ -51,8 +51,19 @@ $(function(){
 			
 			var buttonId = 'deleteButton' + id; 
 			
+			var logoUrl;
+			
+			if(conduit.type==="GIT"){
+				logoUrl = "http://git-scm.com/images/logos/downloads/Git-Icon-1788C.png";
+			}else if(conduit.type==="BZR"){
+				logoUrl = "http://wiki.bazaar.canonical.com/LogoOptions?action=AttachFile&do=get&target=bzr+icon+64.png";
+			}else{
+				logoUrl = "";
+			}
+			
 			$("#whatever").append('<div class="conduitbox">' + 
 			'<div class="conduitLabel">' + conduit.name + 
+			'<img width="64" height="64" style="float:left;margin:5px;" src="' + logoUrl + '"/>' + 
 			'<span class="' + classes + '" style="font-size:10pt;font-weight:normal;font-style:italic;"> [STATUS:' + conduit.status + ']' + 
 			'<button class="deleteButton" id="' + buttonId + '">Delete</button>' + 
 			'</div>' + 

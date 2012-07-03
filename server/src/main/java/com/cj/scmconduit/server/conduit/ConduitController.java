@@ -22,6 +22,7 @@ import com.cj.scmconduit.core.GitP4Conduit;
 import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.core.util.CommandRunnerImpl;
+import com.cj.scmconduit.server.api.ConduitType;
 import com.cj.scmconduit.server.conduit.PushSession.PushStrategy;
 import com.cj.scmconduit.server.fs.TempDirAllocator;
 
@@ -35,6 +36,8 @@ public class ConduitController implements Pusher {
 	private final PushStrategy pushStrategy;
 	private final Map<Integer, PushSession> pushes = new HashMap<Integer, PushSession>();
 	private final TempDirAllocator temps;
+	private final ConduitType type;
+	
 	private ConduitState state = ConduitState.IDLE;
 	private String error;
 	
@@ -47,14 +50,20 @@ public class ConduitController implements Pusher {
 		this.temps = temps;
 		
 		if(new File(pathOnDisk, ".bzr").exists()){
+			type = ConduitType.BZR;
 			pushStrategy = new BzrPushStrategy();
 			conduit = new BzrP4Conduit(pathOnDisk, shell);
 		}else if(new File(pathOnDisk, ".git").exists()){
+			type = ConduitType.GIT;
 			pushStrategy = new GitPushStrategy();
 			conduit = new GitP4Conduit(pathOnDisk, shell);
 		}else{
 			throw new RuntimeException("Not sure what kind of conduit this is: " + pathOnDisk);
 		}
+	}
+	
+	public ConduitType type() {
+		return type;
 	}
 	
 	public String error(){

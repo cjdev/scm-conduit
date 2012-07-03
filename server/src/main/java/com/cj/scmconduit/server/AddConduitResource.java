@@ -5,6 +5,8 @@ import org.httpobjects.Request;
 import org.httpobjects.Response;
 import org.httpobjects.header.response.LocationField;
 
+import com.cj.scmconduit.server.api.ConduitType;
+
 public class AddConduitResource extends HttpObject {
 	public interface Listener {
 		void addConduit(ConduitType type, String name, String p4Path, Integer p4FirstCL);
@@ -25,8 +27,8 @@ public class AddConduitResource extends HttpObject {
 				"		<div>Perforce Path: <input type=\"text\" name=\"p4path\"/></div>" +
 				"		<div>Fetch History Since: <input type=\"text\" name=\"p4FirstCL\"/ value=\"0\"></div>" +
 				"		<div>Conduit Type: <select name=\"type\">" +
-				"			<option>" + ConduitType.BZR + "</option>" + 
 				"			<option>" + ConduitType.GIT + "</option>" + 
+				"			<option>" + ConduitType.BZR + "</option>" + 
 				"		</div>" +
 				"		<input type=\"submit\" value=\"Add\">" +
 				"	</form>" +
