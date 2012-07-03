@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -35,6 +36,7 @@ public class ConduitController implements Pusher {
 	private final Map<Integer, PushSession> pushes = new HashMap<Integer, PushSession>();
 	private final TempDirAllocator temps;
 	private ConduitState state = ConduitState.IDLE;
+	private String error;
 	
 	public ConduitController(URI publicUri, File pathOnDisk, TempDirAllocator temps) {
 		super();
@@ -53,6 +55,14 @@ public class ConduitController implements Pusher {
 		}else{
 			throw new RuntimeException("Not sure what kind of conduit this is: " + pathOnDisk);
 		}
+	}
+	
+	public String error(){
+		return error;
+	}
+	
+	public void delete(){
+		conduit.delete();
 	}
 	
 	public ConduitState state() {
@@ -123,11 +133,14 @@ public class ConduitController implements Pusher {
 			}
 		}
 	}
-
+	
+	private boolean keepRunning = true;
+	private Thread t;
+	
 	public void start(){
-		new Thread(){
+		t = new Thread(){
 			public void run() {
-				while(true){
+				while(keepRunning){
 					try {
 						state = ConduitState.POLLING;
 						pumpIn();
@@ -143,14 +156,16 @@ public class ConduitController implements Pusher {
 						}
 
 					} catch (Exception e) {
-						log.info("ERROR IN CONDUIT " + pathOnDisk + "\n" + stackTrace(e));
+						error = stackTrace(e);
+						log.info("ERROR IN CONDUIT " + pathOnDisk + "\n" + error);
 						log.error("Error in conduit" + pathOnDisk, e);
 						state = ConduitState.ERROR;
 						break;
 					}
 				}
 			}
-		}.start();
+		};
+		t.start();
 	}
 
 	private void handle(PushRequest request) {
@@ -206,6 +221,15 @@ public class ConduitController implements Pusher {
 	private void pumpIn() throws Exception{
 		log.info("Pumping conduit " + pathOnDisk.getAbsolutePath());
 		conduit.push();
+	}
+
+	public void stop() {
+		try {
+			keepRunning = false;
+			t.join();
+		} catch (InterruptedException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 }

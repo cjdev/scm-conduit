@@ -12,6 +12,10 @@
 
 	<name>${project.artifactId}</name>
 	
+	<properties>
+	    <httpobjects-version>0.0.2-SNAPSHOT</httpobjects-version>
+	</properties>
+	
 	<build>
 		<plugins>
             <plugin>
@@ -64,12 +68,12 @@
 	    <dependency>
 			<groupId>org.httpobjects.jetty</groupId>
 			<artifactId>httpobjects-jetty</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
+			<version>${httpobjects-version}</version>
 	    </dependency>
 	    <dependency>
 			<groupId>org.httpobjects.jackson</groupId>
 			<artifactId>httpobjects-jackson</artifactId>
-			<version>0.0.1-SNAPSHOT</version>
+			<version>${httpobjects-version}</version>
 		</dependency>
         <dependency>
 			<groupId>org.codehaus.jackson</groupId>

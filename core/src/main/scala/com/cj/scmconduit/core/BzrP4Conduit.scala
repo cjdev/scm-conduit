@@ -96,7 +96,12 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	
 	override def currentP4Changelist() = state().getLastSyncedP4Changelist();
 
-	
+	override def delete(){
+		val s = state();
+		p4.doCommand("workspace", "-d", s.getP4ClientId())
+  		FileUtils.deleteDirectory(conduitPath);
+	}
+		
 	override def push() { 
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
 

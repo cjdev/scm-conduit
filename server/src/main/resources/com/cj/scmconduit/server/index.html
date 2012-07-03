@@ -23,6 +23,9 @@ td.label {
 span.error {
 	color:red;
 }
+button.deleteButton {
+	float:right;
+}
 </style>
 </head>
 <body>
@@ -36,8 +39,9 @@ $(function(){
 	
 	$.get("/api/conduits", function(result){
 		
-		$.each(result.conduits, function(){
+		$.each(result.conduits, function(index){
 			var conduit = this;
+			var id = index;
 			
 			var classes = "";
 			
@@ -45,9 +49,12 @@ $(function(){
 				classes += " error";
 			}
 			
+			var buttonId = 'deleteButton' + id; 
+			
 			$("#whatever").append('<div class="conduitbox">' + 
 			'<div class="conduitLabel">' + conduit.name + 
 			'<span class="' + classes + '" style="font-size:10pt;font-weight:normal;font-style:italic;"> [STATUS:' + conduit.status + ']' + 
+			'<button class="deleteButton" id="' + buttonId + '">Delete</button>' + 
 			'</div>' + 
 			'<table>' + 
 			'	<tr><td class="label">Type:</td><td>git</td></tr>' + 
@@ -57,6 +64,18 @@ $(function(){
 // 			'	<tr><td class="label">Read/Write:</td><td>ssh://build115.wl.cj.com:3433/</td></tr>' + 
 			'</table>' + 
 			'</div>');
+			
+			$("#" + buttonId).click(function(){
+				var userSaidYes = confirm("delete " + conduit.name + "?");
+				if(userSaidYes){
+					$.ajax("/api/conduits/" + conduit.name, {
+						type:"DELETE",
+						success:function(){
+							window.location.reload();
+						}
+					});
+				}
+			});
 			//append(conduit.p4path);
 			
 			

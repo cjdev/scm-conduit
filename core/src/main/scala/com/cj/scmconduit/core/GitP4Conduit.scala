@@ -6,7 +6,7 @@ import java.util.ArrayList
 import java.util.Arrays
 import java.util.List
 import java.util.regex.Pattern
-import org.apache.commons.io.IOUtils
+import org.apache.commons.io.{IOUtils, FileUtils}
 import com.cj.scmconduit.core.git.GitRevisionInfo
 import com.cj.scmconduit.core.git.GitStatus
 import com.cj.scmconduit.core.p4.P4Changelist
@@ -90,6 +90,12 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	var backlogSize:Int = 0;
 	
 	override def currentP4Changelist() = state().getLastSyncedP4Changelist();
+	
+	override def delete(){
+		val s = state();
+		p4.doCommand("workspace", "-d", s.getP4ClientId())
+  		FileUtils.deleteDirectory(conduitPath);
+	}
 	
 	override def push() {
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
