@@ -127,7 +127,7 @@ public class ConduitServerMain {
 			throw new IOException("Directory does not exist: " + this.tempDirPath);
 		}
 		
-		basePublicUrl = "http://" + config.publicHostname + ":8034";
+		basePublicUrl = "http://" + config.publicHostname + ":" + config.port;
 		log.info("My public url is " + basePublicUrl);
 		
 		p4Address = new P4DepotAddress(config.p4Address);
