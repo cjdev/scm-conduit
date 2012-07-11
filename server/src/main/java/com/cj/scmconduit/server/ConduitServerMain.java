@@ -1,17 +1,13 @@
 package com.cj.scmconduit.server;
 
-import static org.httpobjects.jackson.JacksonDSL.JacksonJson;
-
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
@@ -21,7 +17,6 @@ import org.apache.log4j.Logger;
 import org.httpobjects.HttpObject;
 import org.httpobjects.Request;
 import org.httpobjects.Response;
-import org.httpobjects.jackson.JacksonDSL;
 import org.httpobjects.jetty.HttpObjectsJettyHandler;
 import org.httpobjects.util.ClasspathResourceObject;
 import org.httpobjects.util.HttpObjectUtil;
@@ -35,14 +30,18 @@ import scala.Tuple2;
 import scala.runtime.AbstractFunction1;
 import scala.runtime.BoxedUnit;
 
+import static org.httpobjects.jackson.JacksonDSL.*;
 import com.cj.scmconduit.core.BzrP4Conduit;
-import com.cj.scmconduit.core.GitP4Conduit;
 import com.cj.scmconduit.core.Conduit;
+import com.cj.scmconduit.core.GitP4Conduit;
 import com.cj.scmconduit.core.p4.ClientSpec;
 import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.p4.P4DepotAddress;
 import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.core.util.CommandRunnerImpl;
+import com.cj.scmconduit.server.ConduitServerMain.ConduitConfig;
+import com.cj.scmconduit.server.ConduitServerMain.ConduitCreationThread;
+import com.cj.scmconduit.server.ConduitServerMain.ConduitStuff;
 import com.cj.scmconduit.server.api.ConduitInfoDto;
 import com.cj.scmconduit.server.api.ConduitType;
 import com.cj.scmconduit.server.api.ConduitsDto;
@@ -60,12 +59,7 @@ public class ConduitServerMain {
 			setupLogging();
 			doBzrSafetyCheck();
 			
-			File path = new File(args[0]);
-			String p4Address = args[1];
-			String p4User = args[2];
-			String publicHostname = args.length>3?args[3]:InetAddress.getLocalHost().getCanonicalHostName();
-			
-			Config config = new Config(publicHostname, path, p4Address, p4User);
+			Config config = Config.fromArgs(args);
 			
 			new ConduitServerMain(config);
 		} catch (Exception e) {
@@ -116,7 +110,7 @@ public class ConduitServerMain {
 		
 		p4Address = new P4DepotAddress(config.p4Address);
 		
-		jetty = new Server(8034);
+		jetty = new Server(config.port);
 		ResourceHandler defaultHandler = new ResourceHandler();
 		final VFSResource root = new VFSResource("/");
 		defaultHandler.setBaseResource(root);
