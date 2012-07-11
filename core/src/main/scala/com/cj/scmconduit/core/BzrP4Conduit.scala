@@ -1,12 +1,6 @@
 package com.cj.scmconduit.core;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileReader;
-import java.io.StringReader
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.{BufferedReader, ByteArrayInputStream, File, FileReader, StringReader, FileWriter, IOException, PrintStream}
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.IOUtils
@@ -38,7 +32,7 @@ object BzrP4Conduit {
 		);
 	}
 	
-	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials, observer:(Conduit)=>Unit = {c=>}) {
+	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials, out:PrintStream, observer:(Conduit)=>Unit = {c=>}) {
 			val p4:P4 = new P4Impl(
 					p4Address, 
 					new P4ClientId(spec.clientId),
@@ -46,9 +40,9 @@ object BzrP4Conduit {
 					spec.localPath, 
 					shell)
 	  
-			println(spec)
+			out.println(spec)
 			val changes = p4.doCommand(new ByteArrayInputStream(spec.toString().getBytes()), "client", "-i")
-			println(changes)
+			out.println(changes)
 			
 			shell.run("bzr", "init", spec.localPath.toString())
 					
@@ -67,14 +61,14 @@ object BzrP4Conduit {
 				</scm-conduit-state>
 			    )
 			    
-           val conduit = new BzrP4Conduit(spec.localPath, shell)
+           val conduit = new BzrP4Conduit(spec.localPath, shell, out)
            observer(conduit);
            createDummyInitialP4Commit(spec.localPath, p4, conduit)
 
 	}
 }
 
-class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner) extends Conduit {
+class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner, private val out:PrintStream) extends Conduit {
 	private val TEMP_FILE_NAME = ".scm-conduit-temp"
 	private val META_FILE_NAME = ".scm-conduit"
  
@@ -82,8 +76,8 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	private var p4Address:P4DepotAddress = new P4DepotAddress(state().p4Port)
 	private var p4:P4 = {
 		val s = state();
-	    println(FileUtils.readFileToString(new File(conduitPath, META_FILE_NAME)))
-	    println("The port is " + s.p4Port)
+	    out.println(FileUtils.readFileToString(new File(conduitPath, META_FILE_NAME)))
+	    out.println("The port is " + s.p4Port)
 		  new P4Impl(
 					p4Address, 
 					new P4ClientId(s.p4ClientId),
@@ -141,7 +135,7 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 						args.add(branchPath);
 					}
 					
-					System.out.println("adding " + adds.size());
+					out.println("adding " + adds.size());
 					shell.run("bzr", args:_*);
 				}
 				//runBzr("add");
@@ -308,7 +302,7 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	  val s = BzrStatus.read(runBzr("xmlstatus"));
 
 	  if(s.isUnchanged()){
-			System.out.println("There are no new changes");
+			out.println("There are no new changes");
 			return false;
 		}else{
 			val p4 = p4ForUser(using);
@@ -338,9 +332,9 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 
 
 	private def createP4ChangelistWithMessage(message:String,  p4:P4):Int = {
-		System.out.println("Changes:\n" + message);
+		out.println("Changes:\n" + message);
 
-		System.out.println("Creating changelist");
+		out.println("Creating changelist");
 
 		val changelistText = p4.doCommand("changelist", "-o").replaceAll(Pattern.quote("<enter description here>"), message);
 
@@ -350,7 +344,7 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 
 
 	private def translateBzrStatusToP4Changelist(s:BzrStatus, changeListNum:Integer, p4:P4) {
-		System.out.println("Processing changes");
+		out.println("Processing changes");
 		val filesMoved = new java.util.HashSet[String]();
 
 		if(s.renames.numDirectories()>0){
@@ -359,7 +353,7 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 			//   since your last sync, and you probably want that to move as well.
 			// REALLY, SUCH A CHECK SHOULD PROBABLY BE MANDATORY REGARDLESS
 		    s.renames.directories.foreach{next=>
-				System.out.println("[MOV DIR] " + next.oldPath + " --> " +  next.file);
+				out.println("[MOV DIR] " + next.oldPath + " --> " +  next.file);
 				val pathOnDisk = new File(conduitPath, next.file);
 				if(pathOnDisk.isDirectory()){
 					recursiveMove(pathOnDisk, next.oldPath, next.file, changeListNum, filesMoved);
@@ -369,9 +363,9 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 			}
 		}
 
-		System.out.println(s.renames.numFiles() + " file renames");
+		out.println(s.renames.numFiles() + " file renames");
 		s.renames.files.foreach{next=>
-			System.out.println("[MOV] " + next.oldPath + " --> " +  next.file);
+			out.println("[MOV] " + next.oldPath + " --> " +  next.file);
 			if(!new File(next.file).isDirectory()){
 				p4.doCommand("edit", "-c", changeListNum.toString(), "-k", next.oldPath);
 				p4.doCommand("move", "-c", changeListNum.toString(), "-k", next.oldPath, next.file);
@@ -382,23 +376,23 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		}
 
 		s.additions.files.foreach{next=>
-			System.out.println("[ADD] " + next.file);
+			out.println("[ADD] " + next.file);
 			p4.doCommand("add", "-c", changeListNum.toString(), next.file);
 		}
 		s.deletions.files.foreach{next=>
-			System.out.println("[DEL] " + next.file);
+			out.println("[DEL] " + next.file);
 			p4.doCommand("delete", "-c", changeListNum.toString(), next.file);
 		}
 
 		s.modifications.files.foreach{next=>
-			System.out.println("[MOD] " + next.file);
+			out.println("[MOD] " + next.file);
 			if(filesMoved.contains(next.file)){
 				// NO NEED TO DO ANYTHING ... WE'VE ALREADY OPENED THIS FILE FOR EDITS
 			}else{
 				p4.doCommand("edit", "-c", changeListNum.toString(), next.file);
 			}
 		}
-		System.out.println("Your bzr changes have been saved to " + changeListNum);
+		out.println("Your bzr changes have been saved to " + changeListNum);
 	}
 
 
@@ -418,15 +412,15 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	private def createChangelist(changelistText:String ,  p4:P4):Int = {
 		
 		val output = p4.doCommand(new ByteArrayInputStream(changelistText.getBytes()), "changelist", "-i");
-		System.out.println(output);
+		out.println(output);
 
 		val txt = output
 					.replaceAll(("created."), "")
 					.replaceAll(("Change"), "")
 					.trim();
-		System.out.println("Txt: " + txt);
+		out.println("Txt: " + txt);
 		val changeListNum = Integer.parseInt(txt);
-		System.out.println("Found number " + changeListNum);
+		out.println("Found number " + changeListNum);
 		changeListNum
 	}
 
@@ -442,7 +436,7 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 			}else if(childPath.isDirectory()){
 				recursiveMove(childPath, childOldRelPath, childNewRelPath, changeListNum, filesMoved);
 			}else{
-				System.out.println("Moving child file at " + childPath.getAbsolutePath());
+				out.println("Moving child file at " + childPath.getAbsolutePath());
 				p4.doCommand("edit", "-c", changeListNum.toString(), "-k", childOldRelPath);
 				p4.doCommand("move", "-c", changeListNum.toString(), "-k", childOldRelPath, childNewRelPath);
 				filesMoved.add(childNewRelPath);

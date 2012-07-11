@@ -15,7 +15,7 @@ class BzrP4ConduitE2ETest {
 	def runE2eTest(test:(CommandRunner, ClientSpec, BzrP4Conduit)=>Unit){
 		val path = tempDir()
 		
-		val shell = new CommandRunnerImpl
+		val shell = new CommandRunnerImpl(System.out, System.err)
 		
 		// start p4 server
 		val p4d = startP4dAndWaitUntilItsReady(realDirectory(path/"p4d"))
@@ -101,14 +101,14 @@ class BzrP4ConduitE2ETest {
 			
 			if(!spec.localPath.exists && !spec.localPath.mkdirs()) throw new Exception("Could not create directory: " + spec.localPath)
 	  
-			BzrP4Conduit.create(new P4DepotAddress("localhost:1666"), spec, 0, shell, new P4Credentials(spec.owner, null))
+			BzrP4Conduit.create(new P4DepotAddress("localhost:1666"), spec, 0, shell, new P4Credentials(spec.owner, null), System.out)
 			
 			var pathToDirHintFile = spec.localPath/".p4-directory" 
 			pathToDirHintFile.write("this file tells perforce that this is a directory")
 			p4(spec, shell).doCommand("add", pathToDirHintFile)
 			p4(spec, shell).doCommand("submit", "-d", "initial commit")
 			
-			val conduit = new BzrP4Conduit(spec.localPath, shell)
+			val conduit = new BzrP4Conduit(spec.localPath, shell, System.out)
 			conduit.push()
 			conduit
 	}

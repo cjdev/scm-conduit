@@ -1,15 +1,23 @@
 package com.cj.scmconduit.core.util;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintStream;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
 public class CommandRunnerImpl implements CommandRunner {
+	
+	private final PrintStream theOut;
+	private final PrintStream theErr;
+	
+	public CommandRunnerImpl(PrintStream theOut, PrintStream theErr) {
+		this.theOut = theOut;
+		this.theErr = theErr;
+	}
 
 	public String run(String command, String ... args){
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -43,7 +51,7 @@ public class CommandRunnerImpl implements CommandRunner {
 	}
 	
 	public void runPassThrough(String command, String ... args){
-		run(null, System.err, System.in, command, args);
+		run(null, theErr, System.in, command, args);
 	}
 	
 	public void run(OutputStream sink, OutputStream errSink, InputStream input, String command, String ... args){
@@ -54,23 +62,23 @@ public class CommandRunnerImpl implements CommandRunner {
 				parts.addAll(Arrays.asList(args));
 			}
 			
-			System.out.print("[COMMAND]");
+			theOut.print("[COMMAND]");
 			for(String next : parts){
-				System.out.print(" " + next);
+				theOut.print(" " + next);
 			}
-			System.out.println();
+			theOut.println();
 			
 			int returnCode = new ShellProcess(
 									Runtime.getRuntime().exec(parts.toArray(new String[parts.size()])),
 									sink,
-									errSink,
+									errSink==null?theErr:errSink,
 									input
 								).waitFor();
 			
 			if(returnCode!=0){
 				throw new RuntimeException("Error: command returned " + returnCode);
 			}else{
-				System.out.println("[COMMAND-RETURN] " + returnCode);
+				theOut.println("[COMMAND-RETURN] " + returnCode);
 			}
 			
 		} catch (IOException e) {
@@ -89,7 +97,7 @@ public class CommandRunnerImpl implements CommandRunner {
 			super();
 			this.p = p;
 			
-			stdOut = new StreamConduit(p.getInputStream(), outputSink!=null?outputSink:System.out);
+			stdOut = new StreamConduit(p.getInputStream(), outputSink);
 			stdErr = new StreamConduit(p.getErrorStream(), errOutputSink);
 			if(input!=null){
 				stdIn = new StreamConduit(input, p.getOutputStream());

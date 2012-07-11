@@ -1,4 +1,5 @@
 package com.cj.scmconduit.core
+
 import java.io.{File => LocalPath, IOException, ByteArrayInputStream}
 import com.cj.scmconduit.core.util.CommandRunner
 import com.cj.scmconduit.core.util.CommandRunnerImpl
@@ -251,7 +252,7 @@ class GitP4ConduitE2ETest {
 	def runE2eTest(test:(CommandRunner, ClientSpec, GitP4Conduit)=>Unit){
 		val path = tempDir("conduit")
 		
-		val shell = new CommandRunnerImpl
+		val shell = new CommandRunnerImpl(System.out, System.err)
 		
 		// start p4 server
 		val p4d = startP4dAndWaitUntilItsReady(realDirectory(path/"p4d"))
@@ -325,10 +326,10 @@ class GitP4ConduitE2ETest {
 	
 	def  createGitConduit(spec:ClientSpec, shell:CommandRunner) = {
 		
-		GitP4Conduit.create(new P4DepotAddress("localhost:1666"), spec, 0, shell, new P4Credentials(spec.owner, null))
+		GitP4Conduit.create(new P4DepotAddress("localhost:1666"), spec, 0, shell, new P4Credentials(spec.owner, null), System.out)
   
 		println("Starting conduit")
-		val conduit = new GitP4Conduit(spec.localPath, shell)
+		val conduit = new GitP4Conduit(spec.localPath, shell, System.out)
 		conduit.push()
 		println("Started conduit")
 		conduit

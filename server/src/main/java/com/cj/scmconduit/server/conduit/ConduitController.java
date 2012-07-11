@@ -2,6 +2,7 @@ package com.cj.scmconduit.server.conduit;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
@@ -27,12 +28,12 @@ import com.cj.scmconduit.server.conduit.PushSession.PushStrategy;
 import com.cj.scmconduit.server.fs.TempDirAllocator;
 
 public class ConduitController implements Pusher {
-	private final Log log;
+	private final PrintStream out;
 	private final URI publicUri;
 	private final File pathOnDisk;
 	private final List<PushRequest> requests = new LinkedList<PushRequest>();
 	private final Conduit conduit;
-	private final CommandRunner shell = new CommandRunnerImpl();
+	private final CommandRunner shell;
 	private final PushStrategy pushStrategy;
 	private final Map<Integer, PushSession> pushes = new HashMap<Integer, PushSession>();
 	private final TempDirAllocator temps;
@@ -41,10 +42,10 @@ public class ConduitController implements Pusher {
 	private ConduitState state = ConduitState.IDLE;
 	private String error;
 	
-	public ConduitController(URI publicUri, File pathOnDisk, TempDirAllocator temps) {
+	public ConduitController(PrintStream out, URI publicUri, File pathOnDisk, TempDirAllocator temps) {
 		super();
-		log = LogFactory.getLog(getClass().getName() + ":" + pathOnDisk.getName());
-		log.info("Controller " + pathOnDisk.getPath());
+		this.out = out;
+		this.shell = new CommandRunnerImpl(out, out);
 		this.publicUri = publicUri;
 		this.pathOnDisk = pathOnDisk;
 		this.temps = temps;
@@ -52,11 +53,11 @@ public class ConduitController implements Pusher {
 		if(new File(pathOnDisk, ".bzr").exists()){
 			type = ConduitType.BZR;
 			pushStrategy = new BzrPushStrategy();
-			conduit = new BzrP4Conduit(pathOnDisk, shell);
+			conduit = new BzrP4Conduit(pathOnDisk, shell, out);
 		}else if(new File(pathOnDisk, ".git").exists()){
 			type = ConduitType.GIT;
 			pushStrategy = new GitPushStrategy();
-			conduit = new GitP4Conduit(pathOnDisk, shell);
+			conduit = new GitP4Conduit(pathOnDisk, shell, out);
 		}else{
 			throw new RuntimeException("Not sure what kind of conduit this is: " + pathOnDisk);
 		}
@@ -96,7 +97,7 @@ public class ConduitController implements Pusher {
 	
 	public synchronized PushSession newSession(){
 		Integer id = findAvailableId();
-		log.info("id: " + id);
+		out.println("id: " + id);
 		
 		PushSession session = new PushSession(id, publicUri, pathOnDisk, temps.newTempDir(), pushStrategy, shell);
 		pushes.put(session.id(), session);
@@ -156,18 +157,18 @@ public class ConduitController implements Pusher {
 						PushRequest request = popNextRequest();
 						if(request!=null){
 							state = ConduitState.SENDING;
-							log.info("Handling request: " + request);
+							out.println("Handling request: " + request);
 							handle(request);
 						}else{
-							log.info("Sleeping");
+							out.println("Sleeping");
 							state = ConduitState.IDLE;
 							Thread.sleep(5000);
 						}
 
 					} catch (Exception e) {
 						error = stackTrace(e);
-						log.info("ERROR IN CONDUIT " + pathOnDisk + "\n" + error);
-						log.error("Error in conduit" + pathOnDisk, e);
+						out.println("ERROR IN CONDUIT " + pathOnDisk + "\n" + error);
+						e.printStackTrace(out);
 						state = ConduitState.ERROR;
 						break;
 					}
@@ -181,17 +182,17 @@ public class ConduitController implements Pusher {
 		try {
 			final P4Credentials credentials = request.credentials;
 			String source = request.location.getAbsolutePath();
-			log.info("Pulling from " + source);
+			out.println("Pulling from " + source);
 			boolean changesWerePulled = conduit.pull(source, credentials);
 			if(changesWerePulled){
-				log.info("Committing");
+				out.println("Committing");
 				conduit.commit(credentials);
 				request.listener.pushSucceeded();
 			}else{
 				request.listener.nothingToPush();
 			}
 		} catch (Exception e) {
-			log.info("There was an error: " + e.getMessage());
+			out.println("There was an error: " + e.getMessage());
 			e.printStackTrace(System.out);
 			
 			List<Throwable> errors = new ArrayList<Throwable>();
@@ -228,7 +229,7 @@ public class ConduitController implements Pusher {
 	}
 	
 	private void pumpIn() throws Exception{
-		log.info("Pumping conduit " + pathOnDisk.getAbsolutePath());
+		out.println("Pumping conduit " + pathOnDisk.getAbsolutePath());
 		conduit.push();
 	}
 

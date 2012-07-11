@@ -4,6 +4,8 @@ import java.io.File;
 import java.net.URI;
 import java.util.regex.Pattern;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.sshd.SshServer;
 import org.apache.sshd.server.Command;
 import org.apache.sshd.server.CommandFactory;
@@ -14,6 +16,7 @@ import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.server.conduit.PushSession.PushStrategy;
 
 public class GitPushStrategy implements PushStrategy {
+	private final Log log = LogFactory.getLog(getClass());
 	
 	@Override
 	public void prepareDestinationDirectory(URI publicUri, File conduitLocation, File codePath, CommandRunner shell) {
@@ -33,9 +36,9 @@ public class GitPushStrategy implements PushStrategy {
 			@Override
 			public Command createCommand(String command) {
 				
-				System.out.println("YO: I was asked to create this command: " + command);
+				log.info("YO: I was asked to create this command: " + command);
 				command = command.replaceAll(Pattern.quote("'/code'"), new File(path, "code").getAbsolutePath());
-				System.out.println("I changed the command to " + command);
+				log.info("I changed the command to " + command);
 				return new ProcessShellFactory(command.split(Pattern.quote(" "))).create();
 			}
 		}));

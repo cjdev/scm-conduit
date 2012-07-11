@@ -8,6 +8,8 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.sshd.SshServer;
 import org.apache.sshd.server.FileSystemFactory;
 import org.apache.sshd.server.FileSystemView;
@@ -30,6 +32,7 @@ public class PushSession {
 	
 	private PushSession.State state = State.WAITING_FOR_INPUT;
 
+	private final Log log = LogFactory.getLog(getClass());
 	private final Integer pushId;
 	private final SshDaemon sshServer;
 	private final File onDisk;
@@ -74,13 +77,13 @@ public class PushSession {
 		state = State.FINISHED;
 		this.hadErrors = hasErrors;
 		this.explanation = explanation;
-		System.out.println(getClass().getSimpleName() + " is finished: " + state + "  " + explanation);
+		log.info(getClass().getSimpleName() + " is finished: " + state + "  " + explanation);
 	}
 	
 	public void inputReceived(final Pusher pusher){
 		File codeLocation = codePath();
 		state = PushSession.State.WORKING;
-		out.println("Input received at " + codeLocation);
+		log.info("Input received at " + codeLocation);
 		
 		if(sshServer.credentialsReceived.isEmpty()){
 			close();
@@ -92,17 +95,17 @@ public class PushSession {
 			final P4Credentials credentials = sshServer.credentialsReceived.get(0);
 			pusher.submitPush(codeLocation, credentials, new Pusher.PushListener() {
 				public void pushSucceeded() {
-					out.println("Push succeeded: " + explanation);
+					log.info("Push succeeded: " + explanation);
 					close();
 					markAsFinished(false, "IT WORKED");
 				}
 				public void nothingToPush() {
-					out.println("There was nothing to push");
+					log.info("There was nothing to push");
 					close();
 					markAsFinished(false, "There was nothing to push");
 				}
 				public void pushFailed(String explanation) {
-					out.println("Push failed: " + explanation);
+					log.info("Push failed: " + explanation);
 					close();
 					markAsFinished(true, "THE PUSH FAILED: " + explanation);
 				}
@@ -148,9 +151,10 @@ public class PushSession {
 	public static class SshDaemon {
 		private final List<P4Credentials> credentialsReceived = new ArrayList<P4Credentials>();
 		private final SshServer sshd;
+		private final Log log = LogFactory.getLog(getClass());
 		
 		public SshDaemon(final File path, int port, PushStrategy strategy) { 
-			System.out.println("Serving " + path + " at port " + port);
+			log.info("Serving " + path + " at port " + port);
 			try {
 				sshd = SshServer.setUpDefaultServer();
 				

@@ -1,7 +1,6 @@
 package com.cj.scmconduit.core;
 
-import java.io.File
-import java.io.StringReader
+import java.io.{File, StringReader, PrintStream}
 import java.util.ArrayList
 import java.util.Arrays
 import java.util.List
@@ -28,7 +27,7 @@ import com.cj.scmconduit.core.git.Git
 
 object GitP4Conduit {
   
-	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials, observer:(Conduit)=>Unit = {c=>}) {
+	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials, out:PrintStream, observer:(Conduit)=>Unit = {c=>}) {
 		    spec.localPath.mkdirs()
 		    
 			val p4:P4 = new P4Impl(
@@ -40,9 +39,9 @@ object GitP4Conduit {
 		    
 		    val git = new Git(shell, spec.localPath);
 		    
-			println(spec)
+			out.println(spec)
 			val output = p4.doCommand(new ByteArrayInputStream(spec.toString().getBytes()), "client", "-i")
-			println(output)
+			out.println(output)
 			
 			git.run("init")
 					
@@ -57,7 +56,7 @@ object GitP4Conduit {
 				</scm-conduit-state>
 			    )
 			    
-			val conduit = new GitP4Conduit(spec.localPath, shell)
+			val conduit = new GitP4Conduit(spec.localPath, shell, out)
 			observer(conduit);
 			createDummyInitialP4Commit(spec.localPath, p4, conduit)
 			    
@@ -65,7 +64,7 @@ object GitP4Conduit {
 	
 }
 
-class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner) extends Conduit {
+class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner, private val out:PrintStream) extends Conduit {
 //	private static final String TEMP_FILE_NAME=".scm-conduit-temp";
 	private val META_FILE_NAME=".scm-conduit";
 
@@ -227,18 +226,18 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		git.run("checkout", "incoming");
 		val missing = git.run("cherry", "master");
 		git.run("checkout", "master");
-		System.out.println("Missing is " + missing);
+		out.println("Missing is " + missing);
 		if(missing.isEmpty()){
 			return false;
 		}else{
 			val lines = IOUtils.readLines(new StringReader(missing)).asInstanceOf[List[String]];
 			
 			lines.foreach{line=>
-				System.out.println("Need to fetch " + line);
+				this.out.println("Need to fetch " + line);
 				val rev = line.replaceAll(Pattern.quote("+"), "").trim();
 				git.run("merge", rev);
 				val log = git.run("log", "--name-status", currentRev + ".." + rev);
-				System.out.println(log);
+				this.out.println(log);
 				
 				val changes = new GitRevisionInfo(log);
 				val myp4 = p4ForUser(using)

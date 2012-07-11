@@ -41,7 +41,6 @@ public final class VFSResource extends ResourceCollection {
 	}
 	
 	public void printContents(String padding){
-		System.out.println(padding + getName());
 		for(Resource next: set){
 			if(next instanceof VFSResource){
 				VFSResource s = (VFSResource) next;
@@ -51,7 +50,6 @@ public final class VFSResource extends ResourceCollection {
 	}
 	
 	public void addChild(Resource r){
-		System.out.println("Added " + r + " as " + r.getName() + " on " + getName());
 		set.add(r);
 	}
 	
