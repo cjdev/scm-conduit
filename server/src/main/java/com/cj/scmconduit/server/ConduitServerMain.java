@@ -3,9 +3,11 @@ package com.cj.scmconduit.server;
 import static org.httpobjects.jackson.JacksonDSL.JacksonJson;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.net.URI;
@@ -58,6 +60,7 @@ import com.cj.scmconduit.server.fs.TempDirAllocator;
 import com.cj.scmconduit.server.fs.TempDirAllocatorImpl;
 import com.cj.scmconduit.server.jetty.ConduitHandler;
 import com.cj.scmconduit.server.jetty.VFSResource;
+import com.cj.scmconduit.server.util.SelfResettingFileOutputStream;
 
 
 public class ConduitServerMain {
@@ -155,7 +158,7 @@ public class ConduitServerMain {
 		HttpObject addConduitPage = new AddConduitResource(new AddConduitResource.Listener() {
 			@Override
 			public void addConduit(final ConduitType type, final String name, final String p4Path, final Integer p4FirstCL) {
-				ConduitCreationThread thread = new ConduitCreationThread(outputStreamForConduit(name), config, type, name, p4Path, p4FirstCL, root);
+				ConduitCreationThread thread = new ConduitCreationThread(config, type, name, p4Path, p4FirstCL, root);
 				creationThreads.add(thread);
 				thread.start();
 			}
@@ -198,18 +201,28 @@ public class ConduitServerMain {
 			}
 		};
 		
+		final HttpObject conduitLogResource = new HttpObject("/api/conduits/{conduitName}/log"){
+			@Override
+			public Response get(Request req) {
+				final String conduitName = req.pathVars().valueFor("conduitName");
+				final ConduitStuff conduit = conduitNamed(conduitName);
+				if(conduit==null){
+					return NOT_FOUND();
+				}else{
+					try {
+						final FileInputStream in = new FileInputStream(conduit.log.location);
+						return OK(Bytes("text/plain", in));
+					} catch (FileNotFoundException e) {
+						return INTERNAL_SERVER_ERROR(e);
+					}
+				}
+			}
+		};
+		
+		
 		final HttpObject conduitApiResource = new HttpObject("/api/conduits/{conduitName}"){
 			
 			
-			private ConduitStuff conduitNamed(String name){
-				for(ConduitStuff next : conduits){
-					if(next.isNamed(name)){
-						return next;
-					}
-				}
-				
-				return null;
-			}
 			
 			@Override
 			public Response get(Request req) {
@@ -277,7 +290,8 @@ public class ConduitServerMain {
 							addConduitPage, 
 							depotHandler, 
 							conduitsApiResource,
-							conduitApiResource
+							conduitApiResource,
+							conduitLogResource
 							));
 		
 		jetty.setHandlers(handlers.toArray(new Handler[]{}));
@@ -285,14 +299,41 @@ public class ConduitServerMain {
 		
 	}
 	
-
-	private PrintStream outputStreamForConduit(String name){
+	private ConduitStuff conduitNamed(String name){
+		for(ConduitStuff next : conduits){
+			if(next.isNamed(name)){
+				return next;
+			}
+		}
+		
+		return null;
+	}
+	
+	static class ConduitLog {
+		final File location;
+		final PrintStream stream;
+		
+		public ConduitLog(File location, PrintStream stream) {
+			super();
+			this.location = location;
+			this.stream = stream;
+		}
+	}
+	
+	private ConduitLog logStreamForConduit(String name){
 		try {
-			File f = new File(this.config.path, name + ".log");
+			final File f = new File(this.config.path, name + ".log");
 			log.info("Conduit log is at " + f.getAbsolutePath());
 			if(!f.exists() && !f.createNewFile())
 				throw new RuntimeException("Could not create file at " + f.getAbsolutePath());
-			return new PrintStream(new FileOutputStream(f), true);
+			
+			final Long maxLogSizeInBytes = Long.valueOf(1024*1024 *5);
+			final boolean autoFlush = true;
+			final PrintStream out = new PrintStream(
+										new SelfResettingFileOutputStream(f, maxLogSizeInBytes),
+										autoFlush);
+			
+			return new ConduitLog(f, out);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -305,13 +346,11 @@ public class ConduitServerMain {
 		final String p4Path;
 		final Integer p4FirstCL;
 		final VFSResource root;
-		final PrintStream logFile;
 		Conduit theConduit;
 		
-		private ConduitCreationThread(PrintStream logFile, Config config, ConduitType type,
+		private ConduitCreationThread(Config config, ConduitType type,
 				String name, String p4Path, Integer p4FirstCL, VFSResource root) {
 			super();
-			this.logFile = logFile;
 			this.config = config;
 			this.type = type;
 			this.name = name;
@@ -321,8 +360,11 @@ public class ConduitServerMain {
 		}
 
 		public void run() {
+			PrintStream logStream = null;
 			try{
-				final CommandRunner shell = new CommandRunnerImpl(logFile, logFile);
+				final ConduitLog conduitLog = logStreamForConduit(name);
+				logStream = conduitLog.stream;
+				final CommandRunner shell = new CommandRunnerImpl(logStream, logStream);
 				File localPath = new File(config.basePathForNewConduits, name);
 				log.info("I am going to create something at " + localPath);
 				if(localPath.exists()) throw new RuntimeException("There is already a conduit called \"" + name + "\" " +
@@ -353,9 +395,9 @@ public class ConduitServerMain {
 				};
 				
 				if(type == ConduitType.GIT){
-					GitP4Conduit.create(p4Address, spec, p4FirstCL, shell, credentials, logFile, observerFunction);
+					GitP4Conduit.create(p4Address, spec, p4FirstCL, shell, credentials, logStream, observerFunction);
 				}else if(type == ConduitType.BZR){
-					BzrP4Conduit.create(p4Address, spec, p4FirstCL, shell, credentials, logFile, observerFunction);
+					BzrP4Conduit.create(p4Address, spec, p4FirstCL, shell, credentials, logStream, observerFunction);
 				}else{
 					throw new RuntimeException("not sure how to create a \"" + type + "\" conduit");
 				}
@@ -364,7 +406,8 @@ public class ConduitServerMain {
 				ConduitStuff stuff = prepareConduit(basePublicUrl, root, allocator, conduit);
 				conduits.add(stuff);
 			} catch (Exception e){
-				e.printStackTrace(logFile);
+				e.printStackTrace(logStream==null?System.out:logStream);
+				log.error(e);
 				if(theConduit!=null){
 					theConduit.delete();
 				}
@@ -415,14 +458,16 @@ public class ConduitServerMain {
 		final ConduitConfig config;
 		final ConduitHandler handler;
 		final ConduitController controller;
+		final ConduitLog log;
 		
 		private ConduitStuff(ConduitConfig config, ConduitHandler handler,
-				ConduitController controller) {
+				ConduitController controller, ConduitLog log) {
 			super();
 			this.config = config;
 			this.handler = handler;
 			this.controller = controller;
 			this.p4path = controller.p4Path();
+			this.log = log;
 		}
 		
 
@@ -443,6 +488,7 @@ public class ConduitServerMain {
 			dto.currentP4Changelist = conduit.controller.currentP4Changelist();
 			dto.error = conduit.controller.error();
 			dto.type = conduit.controller.type();
+			dto.logUrl = basePublicUrl + "/api/conduits" + conduit.config.hostingPath + "/log";
 			
 			return dto;
 		}
@@ -450,16 +496,16 @@ public class ConduitServerMain {
 	
 	private ConduitStuff prepareConduit(final String basePublicUrl, VFSResource root, TempDirAllocator allocator, ConduitConfig conduit) {
 		URI publicUri = URI(basePublicUrl + conduit.hostingPath);
-		PrintStream out = outputStreamForConduit(conduit.localPath.getName());
-		ConduitController controller = new ConduitController(out, publicUri, conduit.localPath, allocator);
+		ConduitLog log = logStreamForConduit(conduit.localPath.getName());
+		ConduitController controller = new ConduitController(log.stream, publicUri, conduit.localPath, allocator);
 		controller.start();
 		
 		ConduitHandler handler = new ConduitHandler(conduit.hostingPath, controller);
 		
 		// For basic read-only "GET" access
-		log.info("Serving " + conduit.localPath + " at " + conduit.hostingPath);
+		this.log.info("Serving " + conduit.localPath + " at " + conduit.hostingPath);
 		root.addVResource(conduit.hostingPath, conduit.localPath);
-		return new ConduitStuff(conduit, handler, controller);
+		return new ConduitStuff(conduit, handler, controller, log);
 	}
 	
 	URI URI(String uri){
