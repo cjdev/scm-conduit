@@ -123,9 +123,8 @@ public class ConduitServerMain {
 		this.config = config;
 		this.path = config.path;
 		this.tempDirPath = new File(this.path, "tmp");
-		if(!this.tempDirPath.exists() || !this.tempDirPath.isDirectory()){
-			throw new IOException("Directory does not exist: " + this.tempDirPath);
-		}
+		
+		mkdirs(this.tempDirPath);
 		
 		basePublicUrl = "http://" + config.publicHostname + ":" + config.port;
 		log.info("My public url is " + basePublicUrl);
@@ -297,6 +296,13 @@ public class ConduitServerMain {
 		jetty.setHandlers(handlers.toArray(new Handler[]{}));
 		jetty.start();
 		
+	}
+	
+	
+	private void mkdirs(File path){
+		if(!path.isDirectory() && !path.mkdirs()){
+			throw new RuntimeException("Directory does not exist and I could not create it: " + path.getAbsolutePath());
+		}
 	}
 	
 	private ConduitStuff conduitNamed(String name){
