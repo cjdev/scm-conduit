@@ -31,24 +31,24 @@ public class P4Impl implements P4 {
 	
 	@Override
 	public String doCommand(InputStream in, String ... args){
-		return shell.run(in, P4_SHELL_COMMAND, withArgs(args));
+		return shell.runWithHiddenKey(in, P4_SHELL_COMMAND, credentials.password, withArgs(args));
 	}
 	
 	@Override
 	public String doCommand(String ... parts){
-		return shell.run(P4_SHELL_COMMAND, withArgs(parts));
+		return shell.runWithHiddenKey(P4_SHELL_COMMAND, credentials.password, withArgs(parts));
 	}
 	
 	@Override
 	public List<Change> syncTo(P4RevSpec rev){
-		String output = shell.run(P4_SHELL_COMMAND, withArgs("sync", "..." + rev));
+		String output = shell.runWithHiddenKey(P4_SHELL_COMMAND, credentials.password, withArgs("sync", "..." + rev));
 		P4SyncOutputParser parser = new P4SyncOutputParser();
 		return parser.parse(new StringReader(output));
 	}
 	
 	@Override
 	public List<P4Changelist> changesBetween(P4RevRangeSpec range){
-		String output = shell.run(P4_SHELL_COMMAND, withArgs("changelists", "-lt", "..." + range));
+		String output = shell.runWithHiddenKey(P4_SHELL_COMMAND, credentials.password, withArgs("changelists", "-lt", "..." + range));
 		
 		List<P4Changelist> changes = new ArrayList<P4Changelist>(P4Util.parseChangesFromLongPlusTimeFormat(output));
 		

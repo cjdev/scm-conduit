@@ -19,11 +19,15 @@ public class CommandRunnerImpl implements CommandRunner {
 		this.theErr = theErr;
 	}
 
-	public String run(String command, String ... args){
+	public String run(String command, String ... args) {
+		return runWithHiddenKey(command, null, args);
+	}
+	
+	public String runWithHiddenKey(String command, String hideKey, String ... args) {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		ByteArrayOutputStream errOut = new ByteArrayOutputStream();
 		try {
-			run(out, errOut, null, command, args);
+			run(out, errOut, null, command, null, args);
 			return new String(out.toByteArray());
 		} catch (Exception e) {
 			throw makeErrorMessage(e, out, errOut);
@@ -40,21 +44,25 @@ public class CommandRunnerImpl implements CommandRunner {
 	}
 	
 	public String run(InputStream in, String command, String ... args){
+		return runWithHiddenKey(in, command, null, args);
+	}
+	
+	public String runWithHiddenKey(InputStream in, String command, String hideKey, String ... args){
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		ByteArrayOutputStream errOut = new ByteArrayOutputStream();
 		try {
-			run(out, errOut, in, command, args);
+			run(out, errOut, in, command, hideKey, args);
 		} catch (Exception e) {
 			throw makeErrorMessage(e, out, errOut);
 		}
 		return new String(out.toByteArray());
 	}
 	
-	public void runPassThrough(String command, String ... args){
-		run(null, theErr, System.in, command, args);
+	public void runPassThrough(String command, String hideKey, String ... args){
+		run(null, theErr, System.in, command, hideKey, args);
 	}
 	
-	public void run(OutputStream sink, OutputStream errSink, InputStream input, String command, String ... args){
+	public void run(OutputStream sink, OutputStream errSink, InputStream input, String command, String hideKey, String ... args){
 		try {
 			List<String> parts = new LinkedList<String>();
 			parts.add(command);
@@ -64,7 +72,8 @@ public class CommandRunnerImpl implements CommandRunner {
 			
 			theOut.print("[COMMAND]");
 			for(String next : parts){
-				theOut.print(" " + next);
+				String nextArg = (hideKey != null && !hideKey.trim().equals(""))? next.replace(hideKey, "XXXXXXXX") : next;
+				theOut.print(" " + nextArg);
 			}
 			theOut.println();
 			
