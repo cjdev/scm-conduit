@@ -31,18 +31,70 @@ class GitP4ConduitE2ETest {
     }
   }
   
-//  
-//  @Test
-//  def failsCleanlyWhenUserAccountIsNotSetup(){
-//	runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
-//	  // GIVEN:
-//	  
-//	  // WHEN:
-//	  
-//	  // THEN:
-//	  
-//	}
-//  }
+ 
+  @Test
+  def gracefullyHandlesRacesWithOtherPerforceUsers(){
+    runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+        // GIVEN:
+      
+        {// An existing file in perforce
+            val pathToWorkspace = tempPath("initp4")
+            
+            val iSpec = createP4Workspace("sally", pathToWorkspace, shell)
+            
+            val readmeDotMd = pathToWorkspace/"README.md" 
+            
+            readmeDotMd.delete()
+            readmeDotMd.write("Coming soon...")
+            
+            p4(iSpec, shell).doCommand("edit", readmeDotMd.getAbsolutePath())
+            p4(iSpec, shell).doCommand("submit", "-d", "Initial submit")
+            conduit.push()
+        }
+          
+        
+        {// A perforce user's submission
+            val pathToSallysWorkspace = tempPath("sallysP4")
+            
+            val sallysSpec = createP4Workspace("sally", pathToSallysWorkspace, shell)
+            
+            val sallyDotTxt = pathToSallysWorkspace/"sally.txt" 
+            
+            sallyDotTxt.delete()
+            sallyDotTxt.write("I am mankind")
+            
+            p4(sallysSpec, shell).doCommand("add", sallyDotTxt.getAbsolutePath())
+            p4(sallysSpec, shell).doCommand("submit", "-d", "Added a file wherein I have declared my kind")
+        }
+            
+            
+        {// A git user's conduit submission
+          
+            
+            val pathToFredsClone = tempPath("fredsP4")
+            shell.run("git", "clone", spec.localPath.getAbsolutePath(), pathToFredsClone.getAbsolutePath())
+            
+            val readmeDotMd = pathToFredsClone/"README.md" 
+            
+            readmeDotMd.write("Welcome to the project!")
+            runGit(shell, pathToFredsClone, "add", "--all")
+            runGit(shell, pathToFredsClone, "commit", "-m", "Fleshed-out the REAME.md a little")
+            
+            conduit.pull(pathToFredsClone, new P4Credentials("larry", ""))
+        }
+        
+        
+        // WHEN:
+        conduit.push()
+        
+        // THEN:
+          
+        {// both user's changes should be there
+          val pathToReadme = spec.localPath/"README.md";
+          assertEquals("Fleshed-out the REAME.md a little", pathToReadme.readString)
+        }
+    }
+  }
   
   
 	@Test
