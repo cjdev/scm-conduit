@@ -44,6 +44,7 @@ object GitP4Conduit {
 			out.println(output)
 			
 			git.run("init")
+			git.run("commit", "--allow-empty", "-m", "created conduit")
 					
 			val lastSyncedP4Changelist = if(p4FirstCL==0) p4FirstCL else p4FirstCL - 1
 			
@@ -106,12 +107,17 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		val p4LatestBranchName = "p4-incoming"
 		  
 		val startingPoint = findLastSyncRevision()
-		val doWorkOnSeparateBranch = startingPoint >0
-		if(doWorkOnSeparateBranch){
-		    deleteBranchIfExists(p4LatestBranchName)
-		    git.run("branch", p4LatestBranchName, "cl" + startingPoint)
-		    git.run("checkout", p4LatestBranchName)
-		}
+		
+	    deleteBranchIfExists(p4LatestBranchName)
+	    
+	    val branchPoint = if(startingPoint >0){
+	       "cl" + startingPoint
+	    }else{
+	        "HEAD"
+	    }
+		
+		git.run("branch", p4LatestBranchName, branchPoint)
+		git.run("checkout", p4LatestBranchName)
 		
 		var keepPumping = true;
 		while(keepPumping){
@@ -148,17 +154,16 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 				}
 				
 				
-                git.run("update-server-info")
 				assertNoGitChanges();
 				recordLastSuccessfulSync(nextChange.id());
 			}
 		}
 		
-		if(doWorkOnSeparateBranch){
-		    git.run("checkout", "master")
-		    git.run("rebase", p4LatestBranchName)
-		    git.run("branch", "-d", p4LatestBranchName)
-		}
+	    git.run("checkout", "master")
+	    git.run("rebase", p4LatestBranchName)
+	    
+        git.run("branch", "-d", p4LatestBranchName)
+        git.run("update-server-info")
 	}
 	
 	private def findP4TimeZoneOffset():Int = {

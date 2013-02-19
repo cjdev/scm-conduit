@@ -10,7 +10,12 @@
 	<groupId>com.cj.scmconduit.core</groupId>
 	<artifactId>scm-conduit-core</artifactId>
 	
-	<name>${project.artifactId}</name>	
+	<name>${project.artifactId}</name>
+	
+	<properties>
+	    <httpobjects-version>0.1.0</httpobjects-version>
+	</properties>
+		
 	<build>
 		<sourceDirectory>${basedir}/src/main/scala</sourceDirectory>
 		<testSourceDirectory>${basedir}/src/test/scala</testSourceDirectory>
@@ -62,6 +67,18 @@
 		</plugins>
 	</build>
 	<dependencies>
+	    <dependency>
+			<groupId>org.httpobjects.jetty</groupId>
+			<artifactId>httpobjects-jetty</artifactId>
+			<version>${httpobjects-version}</version>
+			<scope>test</scope>
+	    </dependency>
+		<dependency>
+			<groupId>org.mortbay.jetty</groupId>
+			<artifactId>jetty</artifactId>
+			<version>6.1.25</version>
+			<scope>test</scope>
+		</dependency>
 	    <dependency>
 			<groupId>com.cj.scmconduit.p4</groupId>
 			<artifactId>scm-conduit-p4</artifactId>

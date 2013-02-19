@@ -14,6 +14,9 @@ import com.cj.scmconduit.core.git.GitStatus
 import scala.collection.JavaConversions._
 import org.apache.commons.io.FileUtils
 import java.io.File
+import org.httpobjects.jetty.HttpObjectsJettyHandler
+import org.httpobjects.util.ClasspathResourcesObject
+import org.httpobjects.util.FilesystemResourcesObject
 
 class GitP4ConduitE2ETest {
   
@@ -277,11 +280,32 @@ class GitP4ConduitE2ETest {
 			conduit.push()
 			
 			// then
-			val branch = tempPath("myclone")
-			shell.run("git", "clone", spec.localPath, branch)
-			val localADotTxt = branch/"a.txt"
-			assertTrue("the file should be in git", localADotTxt exists)
-			assertEquals("hello world", localADotTxt.readString())
+			{
+    			val branch = tempPath("myclone")
+                shell.run("git", "clone", spec.localPath, branch)
+                val localADotTxt = branch/"a.txt"
+                assertTrue("the file should be in git", localADotTxt exists)
+                assertEquals("hello world", localADotTxt.readString())
+              
+			}
+			
+			
+			{// the data should be accesible to a 'dumb' server
+			  val jetty = HttpObjectsJettyHandler.launchServer(8080, new FilesystemResourcesObject("/{resource*}", spec.localPath));
+			  
+			  try{
+//			    Thread.sleep(1000*80)
+			    
+			    val branch = tempPath("myclone")
+                shell.run("git", "clone", "http://localhost:8080/.git/", branch)
+                val localADotTxt = branch/"a.txt"
+                assertTrue("the file should be in git", localADotTxt exists)
+                assertEquals("hello world", localADotTxt.readString())
+			    
+			  }finally{
+			    jetty.stop();
+			  }
+			}
 		}
 	}
 	
