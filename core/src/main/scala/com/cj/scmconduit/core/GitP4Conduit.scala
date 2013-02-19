@@ -143,12 +143,12 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 				        git.run(command:_*);
 				        }
 				        
-				        git.run("update-server-info")
 				    }
 				    
 				}
 				
 				
+                git.run("update-server-info")
 				assertNoGitChanges();
 				recordLastSuccessfulSync(nextChange.id());
 			}
@@ -297,7 +297,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
       git.run("checkout", "master")
 	    
 	  try{
-            git.run("branch", "-d", p4LatestBranchName);
+            git.run("branch", "-D", p4LatestBranchName);
         }catch{
           case _=>// nothing to do
         }
