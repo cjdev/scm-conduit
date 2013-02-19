@@ -104,9 +104,11 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
 		
 		val p4LatestBranchName = "p4-incoming"
+		  
 		val startingPoint = findLastSyncRevision()
 		val doWorkOnSeparateBranch = startingPoint >0
 		if(doWorkOnSeparateBranch){
+		    deleteBranchIfExists(p4LatestBranchName)
 		    git.run("branch", p4LatestBranchName, "cl" + startingPoint)
 		    git.run("checkout", p4LatestBranchName)
 		}
@@ -229,24 +231,23 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	}
 	
 	override def pull(source:String, using:P4Credentials):Boolean = {
+	    val incomingBranchName = "incoming"
+	  
 		try{
 			git.run("remote", "rm", "temp");
 		}catch{
 		  case _=>// nothing to do
 		}
-		try{
-			git.run("branch", "-D", "incoming");
-		}catch{
-		  case _=>// nothing to do
-		}
+		deleteBranchIfExists(incomingBranchName)
 		  
 		val currentRev = git.run("log", "-1", "--format=%H").trim();
 		git.run("remote", "add", "temp", source);
 		git.run("fetch", "temp");
-		git.run("branch", "incoming", "temp/master");
-		git.run("checkout", "incoming");
+		git.run("branch", incomingBranchName, "temp/master");
+		git.run("checkout", incomingBranchName);
 		val missing = git.run("cherry", "master");
 		git.run("checkout", "master");
+        git.run("branch", "-d", incomingBranchName);
 		out.println("Missing is " + missing);
 		if(missing.isEmpty()){
 			return false;
@@ -290,6 +291,16 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	    case e:Exception=>false// show-ref can return -1, which causes the git class here to show an error
 	  }
 	  hasTag
+	}
+  
+  private def deleteBranchIfExists(p4LatestBranchName: java.lang.String): Any = {
+      git.run("checkout", "master")
+	    
+	  try{
+            git.run("branch", "-d", p4LatestBranchName);
+        }catch{
+          case _=>// nothing to do
+        }
 	}
 
 }
