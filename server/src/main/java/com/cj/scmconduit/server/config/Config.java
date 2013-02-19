@@ -2,15 +2,11 @@ package com.cj.scmconduit.server.config;
 
 import java.io.File;
 import java.net.InetAddress;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
-import com.cj.scmconduit.core.p4.P4DepotAddress;
 import com.cj.scmconduit.server.jaxb.FileXmlAdapter;
 
 @XmlRootElement

@@ -12,6 +12,8 @@
 	
 	<name>${project.artifactId}</name>	
 	<build>
+		<sourceDirectory>${basedir}/src/main/scala</sourceDirectory>
+		<testSourceDirectory>${basedir}/src/test/scala</testSourceDirectory>
 		<plugins>
             <plugin>
                 <groupId>org.scala-tools</groupId>

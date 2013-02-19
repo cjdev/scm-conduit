@@ -31,6 +31,7 @@ import org.httpobjects.Request;
 import org.httpobjects.Response;
 import org.httpobjects.jetty.HttpObjectsJettyHandler;
 import org.httpobjects.util.ClasspathResourceObject;
+import org.httpobjects.util.ClasspathResourcesObject;
 import org.httpobjects.util.HttpObjectUtil;
 import org.httpobjects.util.Method;
 import org.mortbay.jetty.Handler;
@@ -286,6 +287,7 @@ public class ConduitServerMain {
 		handlers.add(new HttpObjectsJettyHandler(
 							new ClasspathResourceObject("/", "index.html", getClass()), 
 							new ClasspathResourceObject("/submit.py", "submit.py", getClass()), 
+                            new ClasspathResourcesObject("/{resource}", getClass()),
 							addConduitPage, 
 							depotHandler, 
 							conduitsApiResource,

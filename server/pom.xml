@@ -13,7 +13,7 @@
 	<name>${project.artifactId}</name>
 	
 	<properties>
-	    <httpobjects-version>0.0.2-SNAPSHOT</httpobjects-version>
+	    <httpobjects-version>0.1.0</httpobjects-version>
 	</properties>
 	
 	<build>
