@@ -40,7 +40,7 @@ class GitP4ConduitE2ETest {
         {// An existing file in perforce
             val pathToWorkspace = tempPath("initp4")
             
-            val iSpec = createP4Workspace("sally", pathToWorkspace, shell)
+            val iSpec = createP4Workspace("MrSetup", pathToWorkspace, shell)
             
             val readmeDotMd = pathToWorkspace/"README.md" 
             
