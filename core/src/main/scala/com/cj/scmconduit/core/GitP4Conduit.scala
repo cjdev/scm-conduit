@@ -103,11 +103,11 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	override def push() {
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
 		
-		val p4LatestBranchName = "p4latest"
+		val p4LatestBranchName = "p4-incoming"
 		val startingPoint = findLastSyncRevision()
-		val doFix = startingPoint >0
-		if(doFix){
-		    git.run("branch", p4LatestBranchName, "cl" + findLastSyncRevision())
+		val doWorkOnSeparateBranch = startingPoint >0
+		if(doWorkOnSeparateBranch){
+		    git.run("branch", p4LatestBranchName, "cl" + startingPoint)
 		    git.run("checkout", p4LatestBranchName)
 		}
 		
@@ -119,21 +119,13 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 			backlogSize = newStuff.size()
 			
 			if(newStuff.isEmpty()){
-				keepPumping = false;
+				keepPumping = false;;
 			}else{
 			    assertNoGitChanges();
 				val nextChange = newStuff.get(0);
 				
-				
-				val hasTag = try{
-				  val matches = git.run("show-ref", "--tags", "cl" + nextChange.id())
-				  matches.trim().length()>1
-				}catch {
-				  case e:Exception=>false;// show-ref can return -1, which causes the git class here to show an error
-				}
-				
-				if(hasTag){
-				  out.println("WARN: Changelist " + nextChange.id() + " is already here; I'm assuming this is because a p4 user beat me to perforce")
+				if(gitHasTagForChangelist(nextChange)){
+				  out.println("WARN: Looks like git already knows about changelist #" + nextChange.id() + "; I'm assuming this is because a p4 user beat me to perforce")
 				}else{
 				  
 				    val changes = p4.syncTo(P4RevSpec.forChangelist(nextChange.id()));
@@ -160,7 +152,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 			}
 		}
 		
-		if(doFix){
+		if(doWorkOnSeparateBranch){
 		    git.run("checkout", "master")
 		    git.run("rebase", p4LatestBranchName)
 		    git.run("branch", "-d", p4LatestBranchName)
@@ -288,6 +280,16 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 			git.run("update-server-info")
 			return true;
 		}
+	}
+  
+  private def gitHasTagForChangelist(nextChange: com.cj.scmconduit.core.p4.P4Changelist): Boolean = {
+	  val hasTag = try{
+	    val matches = git.run("show-ref", "--tags", "cl" + nextChange.id())
+	    matches.trim().length()>1
+	  }catch {
+	    case e:Exception=>false// show-ref can return -1, which causes the git class here to show an error
+	  }
+	  hasTag
 	}
 
 }
