@@ -5,7 +5,6 @@ import com.cj.scmconduit.core.util.CommandRunner
 import com.cj.scmconduit.core.util.CommandRunnerImpl
 import scala.xml._
 import com.cj.scmconduit.core.p4._
-import com.cj.scmconduit.core.GitP4Conduit
 import org.junit.{
   Test, Before
 }
@@ -30,7 +29,6 @@ class GitP4ConduitE2ETest {
     	dir = dir.getParentFile()
     }
   }
-  
  
   @Test
   def gracefullyHandlesRacesWithOtherPerforceUsers(){
@@ -89,10 +87,15 @@ class GitP4ConduitE2ETest {
         
         // THEN:
           
-        {// both user's changes should be there
+        {// the git user's changes should be there
           val pathToReadme = spec.localPath/"README.md";
-          assertEquals("Fleshed-out the REAME.md a little", pathToReadme.readString)
+          assertEquals("Welcome to the project!", pathToReadme.readString)
         }
+        {// the p4 user's changes should be there
+          val pathToSallyDotTxt = spec.localPath/"sally.txt" ;
+          assertEquals("I am mankind", pathToSallyDotTxt.readString)
+        }
+
     }
   }
   

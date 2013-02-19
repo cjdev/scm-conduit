@@ -102,7 +102,15 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	
 	override def push() {
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
-
+		
+		val p4LatestBranchName = "p4latest"
+		val startingPoint = findLastSyncRevision()
+		val doFix = startingPoint >0
+		if(doFix){
+		    git.run("branch", p4LatestBranchName, "cl" + findLastSyncRevision())
+		    git.run("checkout", p4LatestBranchName)
+		}
+		
 		var keepPumping = true;
 		while(keepPumping){
 			val lastSync = findLastSyncRevision();
@@ -113,28 +121,49 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 			if(newStuff.isEmpty()){
 				keepPumping = false;
 			}else{
+			    assertNoGitChanges();
 				val nextChange = newStuff.get(0);
-				assertNoGitChanges();
-				val changes = p4.syncTo(P4RevSpec.forChangelist(nextChange.id()));
 				
-				val status = new GitStatus(git.run("status", "-s"))
 				
-				val filesICareAbout = status.files.filter{change=>change.file != ".scm-conduit"}
-				
-				if (filesICareAbout.size > 0){
-				  
-					val gitCommands = new P42GitTranslator(conduitPath).translate(nextChange, changes, p4TimeZoneOffset);
-					gitCommands.foreach{command=>
-						git.run(command:_*);
-					}
-					
-					git.run("update-server-info")
+				val hasTag = try{
+				  val matches = git.run("show-ref", "--tags", "cl" + nextChange.id())
+				  matches.trim().length()>1
+				}catch {
+				  case e:Exception=>false;// show-ref can return -1, which causes the git class here to show an error
 				}
 				
-				assertNoGitChanges();
+				if(hasTag){
+				  out.println("WARN: Changelist " + nextChange.id() + " is already here; I'm assuming this is because a p4 user beat me to perforce")
+				}else{
+				  
+				    val changes = p4.syncTo(P4RevSpec.forChangelist(nextChange.id()));
+				    
+				    val status = new GitStatus(git.run("status", "-s"))
+				    
+				    val filesICareAbout = status.files.filter{change=>change.file != ".scm-conduit"}
+				    
+				    if (filesICareAbout.size > 0){
+				        
+				        val gitCommands = new P42GitTranslator(conduitPath).translate(nextChange, changes, p4TimeZoneOffset);
+				        gitCommands.foreach{command=>
+				        git.run(command:_*);
+				        }
+				        
+				        git.run("update-server-info")
+				    }
+				    
+				}
 				
+				
+				assertNoGitChanges();
 				recordLastSuccessfulSync(nextChange.id());
 			}
+		}
+		
+		if(doFix){
+		    git.run("checkout", "master")
+		    git.run("rebase", p4LatestBranchName)
+		    git.run("branch", "-d", p4LatestBranchName)
 		}
 	}
 	

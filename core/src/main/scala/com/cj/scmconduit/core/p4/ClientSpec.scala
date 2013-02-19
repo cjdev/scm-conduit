@@ -8,7 +8,7 @@ Client:  """ + clientId + """
 Owner:  """ + owner + """
 Host:    """ + host + """
 Root:   """ + localPath.getAbsolutePath() + """
-Options:        noallwrite noclobber nocompress unlocked nomodtime normdir
+Options:        noallwrite clobber nocompress unlocked nomodtime normdir
 SubmitOptions:  submitunchanged
 LineEnd:        local
 View:""" + view.map(mapping=> "\n   " + mapping._1 + " " + "//" + clientId + mapping._2).mkString("")
