@@ -10,7 +10,6 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class CommandRunnerImpl implements CommandRunner {
-	
 	private final PrintStream theOut;
 	private final PrintStream theErr;
 	
@@ -23,11 +22,15 @@ public class CommandRunnerImpl implements CommandRunner {
 		return runWithHiddenKey(command, null, args);
 	}
 	
+	public String run(InputStream in, String command, String ... args) {
+		return runWithHiddenKey(in, command, null, args);
+	}
+	
 	public String runWithHiddenKey(String command, String hideKey, String ... args) {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		ByteArrayOutputStream errOut = new ByteArrayOutputStream();
 		try {
-			run(out, errOut, null, command, null, args);
+			run(out, errOut, null, command, hideKey, args);
 			return new String(out.toByteArray());
 		} catch (Exception e) {
 			throw makeErrorMessage(e, out, errOut);
@@ -35,16 +38,11 @@ public class CommandRunnerImpl implements CommandRunner {
 	}
 		
 	private RuntimeException makeErrorMessage(Throwable e, ByteArrayOutputStream out, ByteArrayOutputStream errOut){
-
 		return new RuntimeException("Error.  " + e.getMessage() + "\n" + 
 				"=============== StdOut ============= \n" + 
 				new String(out.toByteArray()) + "\n" +
 				"=============== StdErr ============= \n" + 
 				 new String(errOut.toByteArray()));
-	}
-	
-	public String run(InputStream in, String command, String ... args){
-		return runWithHiddenKey(in, command, null, args);
 	}
 	
 	public String runWithHiddenKey(InputStream in, String command, String hideKey, String ... args){
@@ -58,11 +56,7 @@ public class CommandRunnerImpl implements CommandRunner {
 		return new String(out.toByteArray());
 	}
 	
-	public void runPassThrough(String command, String hideKey, String ... args){
-		run(null, theErr, System.in, command, hideKey, args);
-	}
-	
-	public void run(OutputStream sink, OutputStream errSink, InputStream input, String command, String hideKey, String ... args){
+	private void run(OutputStream sink, OutputStream errSink, InputStream input, String command, String hideKey, String ... args){
 		try {
 			List<String> parts = new LinkedList<String>();
 			parts.add(command);

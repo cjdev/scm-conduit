@@ -1,28 +1,28 @@
 package com.cj.scmconduit.core
 
-import java.io.{File => LocalPath, IOException, ByteArrayInputStream}
-import com.cj.scmconduit.core.util.CommandRunner
-import com.cj.scmconduit.core.util.CommandRunnerImpl
-import scala.xml._
-import com.cj.scmconduit.core.p4._
-import org.junit.{
-  Test, Before
-}
-import RichFile._
-import org.junit.Assert._
-import com.cj.scmconduit.core.git.GitStatus
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.{File => LocalPath}
+import java.io.File
 import scala.collection.JavaConversions._
 import org.apache.commons.io.FileUtils
-import java.io.File
 import org.httpobjects.jetty.HttpObjectsJettyHandler
-import org.httpobjects.util.ClasspathResourcesObject
 import org.httpobjects.util.FilesystemResourcesObject
+import org.junit.Assert._
+import org.junit.Before
+import org.junit.Test
+import com.cj.scmconduit.core.git.GitStatus
+import com.cj.scmconduit.core.p4._
+import com.cj.scmconduit.core.util.CommandRunner
+import com.cj.scmconduit.core.util.CommandRunnerImpl
+import RichFile._
+import java.io.OutputStream
+import java.io.PrintStream
 
 class GitP4ConduitE2ETest {
   
   @Before
   def safetyCheck(){
-    
     var dir = new LocalPath(System.getProperty("user.dir"))
     
     while(dir!=null){
@@ -132,6 +132,37 @@ class GitP4ConduitE2ETest {
 			assertEquals("", localChanges)
 			
 		}
+	}
+	
+	@Test
+	def conduitDoesNotSpitOutPasswordsInLog() {
+		val baos = new ByteArrayOutputStream()
+		val cmdRunner = new CommandRunnerImpl(new PrintStream(baos), new PrintStream(baos))
+		
+  		runE2eTestWithCustomCommandRunner(cmdRunner, {(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+	  		//GIVEN some p4 workspace history
+  		  	val pathToSallysWorkspace = tempPath("sallysP4")
+	  		val sallysSpec = createP4Workspace("sally", pathToSallysWorkspace, shell)
+	  		val sallysADotTxt = pathToSallysWorkspace/"README.md" 
+	
+	  		sallysADotTxt.delete()
+	  		sallysADotTxt.write("I am a tree")
+	
+	  		p4(sallysSpec, shell).doCommand("edit", sallysADotTxt.getAbsolutePath())
+	  		p4(sallysSpec, shell).doCommand("submit", "-d", "declared my nature as a tree")
+	  		conduit.push();
+	  		
+  		  	//WHEN branch it in git, then add some stuff
+  		  	val branch = tempPath("myclone")
+  			shell.run("git", "clone", spec.localPath.getAbsolutePath(), branch.getAbsolutePath())
+  			
+  			(branch/"README.md").write("I am a bee")
+		    runGit(shell, branch, "add", "README.md")
+		    runGit(shell, branch, "commit", "-m", "I think I'm a bee")
+  		})
+  		
+  		//THEN the password is not printed in the log file
+  		assertFalse(baos.toString().contains("PASSWORD_YOU_SHOULDNT_SEE"))
 	}
 	
 	
@@ -328,10 +359,8 @@ class GitP4ConduitE2ETest {
 		sallysSpec
 	}
 	
-	def runE2eTest(test:(CommandRunner, ClientSpec, GitP4Conduit)=>Unit){
+	def runE2eTestWithCustomCommandRunner(shell:CommandRunner, test:(CommandRunner, ClientSpec, GitP4Conduit)=> Unit) {
 		val path = tempDir("conduit")
-		
-		val shell = new CommandRunnerImpl(System.out, System.err)
 		
 		// start p4 server
 		val p4d = startP4dAndWaitUntilItsReady(realDirectory(path/"p4d"))
@@ -363,7 +392,10 @@ class GitP4ConduitE2ETest {
 		} finally {
 			p4d.destroy()
 		}
-	  
+	}
+	
+	def runE2eTest(test:(CommandRunner, ClientSpec, GitP4Conduit)=>Unit) {
+		runE2eTestWithCustomCommandRunner(new CommandRunnerImpl(System.out, System.err), test)
 	}
   
 	
@@ -395,7 +427,7 @@ class GitP4ConduitE2ETest {
 		p
 	}
 	
-	def p4(spec:ClientSpec, shell:CommandRunner)= new P4Impl(new P4DepotAddress("localhost:1666"), new P4ClientId(spec.clientId), new P4Credentials(spec.owner, ""), spec.localPath, shell);
+	def p4(spec:ClientSpec, shell:CommandRunner)= new P4Impl(new P4DepotAddress("localhost:1666"), new P4ClientId(spec.clientId), new P4Credentials(spec.owner, "PASSWORD_YOU_SHOULDNT_SEE"), spec.localPath, shell);
 	
 	def runGit(shell:CommandRunner, dir:LocalPath, args:String*) = {
 	    val gitDir = new LocalPath(dir, ".git") 
