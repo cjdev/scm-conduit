@@ -40,8 +40,16 @@ div.error {
 
 <script>
 $(function(){
-	
+	function compareAlphabetically(a, b){
+		if(a===b) return 0; 
+		else if(a>b) return 1; 
+		else return -1
+	}
 	$.get("/api/conduits", function(result){
+		
+		result.conduits.sort(function(a,b){
+			return compareAlphabetically(a.name, b.name);
+		});
 		
 		$.each(result.conduits, function(index){
 			var conduit = this;
