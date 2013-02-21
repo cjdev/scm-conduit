@@ -26,6 +26,10 @@ span.error {
 button.deleteButton {
 	float:right;
 }
+
+div.error {
+	background:rgb(255, 182, 182);
+}
 </style>
 </head>
 <body>
@@ -43,10 +47,13 @@ $(function(){
 			var conduit = this;
 			var id = index;
 			
-			var classes = "";
+			var additionalWidgetClasses = "";
 			
-			if(conduit.status === "ERROR"){
-				classes += " error";
+			var statusClasses = "";
+			
+			if(conduit.error){
+				statusClasses += " error";
+				additionalWidgetClasses += " error";
 			}
 			
 			var buttonId = 'deleteButton' + id; 
@@ -61,10 +68,10 @@ $(function(){
 				logoUrl = "";
 			}
 			
-			$("#whatever").append('<div class="conduitbox">' + 
+			$("#whatever").append('<div class="conduitbox ' + additionalWidgetClasses + '">' + 
 			'<div class="conduitLabel">' + conduit.name + 
 			'<img width="64" height="64" style="float:left;margin:5px;" src="' + logoUrl + '"/>' + 
-			'<span class="' + classes + '" style="font-size:10pt;font-weight:normal;font-style:italic;"> [STATUS:' + conduit.status + ']' + 
+			'<span class="' + statusClasses + '" style="font-size:10pt;font-weight:normal;font-style:italic;"> [STATUS:' + conduit.status + ']' + 
 			' <a href="' + conduit.logUrl + '">LOG</a> ' + 
 			'<button class="deleteButton" id="' + buttonId + '">Delete</button>' + 
 			'</div>' + 

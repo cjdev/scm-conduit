@@ -158,22 +158,30 @@ public class ConduitController implements Pusher {
 						}else{
 							out.println("Sleeping");
 							state = ConduitState.IDLE;
-							Thread.sleep(5000);
+							sleepMillis(5000);
 						}
-
+						error = null;
+						
 					} catch (Exception e) {
 						error = stackTrace(e);
 						out.println("ERROR IN CONDUIT " + pathOnDisk + "\n" + error);
 						e.printStackTrace(out);
-						state = ConduitState.ERROR;
-						break;
+						sleepMillis(5000);
 					}
 				}
 			}
 		};
 		t.start();
 	}
-
+	
+	private static void sleepMillis(long millis){
+	    try{
+            Thread.sleep(millis);
+	    }catch(Exception e){
+	        throw new RuntimeException(e);
+	    }
+	}
+	
 	private void handle(PushRequest request) {
 		try {
 			final P4Credentials credentials = request.credentials;
