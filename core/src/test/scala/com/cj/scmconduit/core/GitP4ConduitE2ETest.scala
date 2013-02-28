@@ -102,6 +102,50 @@ class GitP4ConduitE2ETest {
     }
   }
   
+    @Test
+    def accomodatesPerforceChangelistsThatConsistsExcluseivelyOfFilesThatHaveNotChanged() {
+        runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+            
+            // GIVEN: A new conduit connected to a depot with an empty history, and a git branch with one change
+            {// An existing file in perforce
+                val pathToWorkspace = tempPath("initp4")
+                
+                val iSpec = createP4Workspace("MrSetup", pathToWorkspace, shell)
+                
+                val readmeDotMd = pathToWorkspace/"README.md" 
+                
+                readmeDotMd.delete()
+                readmeDotMd.write("Coming soon...")
+                
+                p4(iSpec, shell).doCommand("edit", readmeDotMd.getAbsolutePath())
+                p4(iSpec, shell).doCommand("submit", "-d", "Initial submit")
+                conduit.push()
+            }
+              
+            
+            {// A changelist consisting of 1 file for which there are no changes
+                val pathToWorkspace = tempPath("sallysP4")
+                
+                val sallysSpec = createP4Workspace("sally", pathToWorkspace, shell)
+                
+                val readmeDotMd = pathToWorkspace/"README.md" 
+                
+                p4(sallysSpec, shell).doCommand("edit", readmeDotMd.getAbsolutePath())
+                p4(sallysSpec, shell).doCommand("submit", "-d", "Looks like I changed this but I actually did nothing!")
+                conduit.push()
+            }
+            
+            
+            // WHEN:
+            val maybeErr = try{
+                    conduit.push()
+                    None
+                }catch {case t:Throwable=>Some(t)}
+            
+            // THEN
+            assertEquals(None, maybeErr)//"The conduit should not blow up", err)
+        }
+    }
   
 	@Test
 	def returnsFalseWhenThereIsNothingToPush() {

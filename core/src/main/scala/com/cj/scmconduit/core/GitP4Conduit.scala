@@ -151,6 +151,8 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 				        
 				    }
 				    
+				    git.run("tag", "cl" + nextChange.id());
+				    
 				}
 				
 				

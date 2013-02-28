@@ -51,19 +51,14 @@ class P42GitTranslator (private val conduitPath:File) {
 			  }
 			
 		}
-		//runGit("add");
 		
-		gitCommands.add(asList(
-				"commit", 
-				"--author=" + nextChange.whoString() + " <" + nextChange.whoString() + ">",
-				"--date=" + toBzrCommitDateFormat(nextChange.getWhen(), p4TimeZoneOffset),
-				//"--allow-empty",
-				"-m",
-				nextChange.description() + "\n\n" + "[lives in perforce as CL#" + nextChange.id() + "]"));
-		
-		gitCommands.add(asList(
-				"tag",
-				"cl" + nextChange.id()));
+	  gitCommands.add(asList(
+            "commit", 
+            "--author=" + nextChange.whoString() + " <" + nextChange.whoString() + ">",
+            "--date=" + toBzrCommitDateFormat(nextChange.getWhen(), p4TimeZoneOffset),
+//              "--allow-empty",
+            "-m",
+            nextChange.description() + "\n\n" + "[lives in perforce as CL#" + nextChange.id() + "]"));
 		
 		return gitCommands;
 	}
