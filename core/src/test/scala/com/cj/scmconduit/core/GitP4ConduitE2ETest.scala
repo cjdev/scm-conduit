@@ -53,7 +53,6 @@ class GitP4ConduitE2ETest {
             conduit.push()
         }
           
-        
         {// A perforce user's submission
             val pathToSallysWorkspace = tempPath("sallysP4")
             
@@ -68,10 +67,7 @@ class GitP4ConduitE2ETest {
             p4(sallysSpec, shell).doCommand("submit", "-d", "Added a file wherein I have declared my kind")
         }
             
-            
         {// A git user's conduit submission
-          
-            
             val pathToFredsClone = tempPath("fredsP4")
             shell.run("git", "clone", spec.localPath.getAbsolutePath(), pathToFredsClone.getAbsolutePath())
             
@@ -83,7 +79,6 @@ class GitP4ConduitE2ETest {
             
             conduit.pull(pathToFredsClone, new P4Credentials("larry", ""))
         }
-        
         
         // WHEN:
         conduit.push()
@@ -384,8 +379,6 @@ class GitP4ConduitE2ETest {
 		}
 	}
 	
-	
-	
 	private def createP4Workspace(userName:String, where:LocalPath, shell:CommandRunner) = {
 		val userSpec = new UserSpec(id=userName, email=userName+"@host.com", fullName = userName)
 		shell.run(new ByteArrayInputStream(userSpec.toString.getBytes()), "p4", "-p", "localhost:1666", "user", "-i", "-f")
@@ -442,13 +435,16 @@ class GitP4ConduitE2ETest {
 		runE2eTestWithCustomCommandRunner(new CommandRunnerImpl(System.out, System.err), test)
 	}
   
-	
 	def startP4dAndWaitUntilItsReady(p4dDataDirectory:LocalPath) = {
 		var text = ""
 
-		var p = new ProcessBuilder("p4d", "-r", p4dDataDirectory.getAbsolutePath)
+		var process = new ProcessBuilder("p4d", "-r", p4dDataDirectory.getAbsolutePath)
 					.redirectErrorStream(true)
-					.start()
+		var env = process.environment()
+		env.put("P4PORT", "localhost:1666")
+		
+		var p = process.start()
+		
 		val in = p.getInputStream()
 		val buffer = new Array[Byte](1024 * 1024)
 
@@ -480,7 +476,6 @@ class GitP4ConduitE2ETest {
 	}
 	
 	def  createGitConduit(spec:ClientSpec, shell:CommandRunner) = {
-		
 		GitP4Conduit.create(new P4DepotAddress("localhost:1666"), spec, 0, shell, new P4Credentials(spec.owner, null), System.out)
   
 		println("Starting conduit")
@@ -489,7 +484,4 @@ class GitP4ConduitE2ETest {
 		println("Started conduit")
 		conduit
 	}
-	
-	
-
 }

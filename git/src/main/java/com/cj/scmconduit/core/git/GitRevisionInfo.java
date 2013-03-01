@@ -52,7 +52,6 @@ public class GitRevisionInfo {
 	
 	public GitRevisionInfo(String log) {
 		try{
-
 			String author = null;
 			String commit = null;
 			String date = null;
@@ -166,10 +165,6 @@ public class GitRevisionInfo {
 			}
 		}
 		
-		public void next(){
-			pos++;
-		}
-		
 		public String scanUntil(Condition c) {
 			StringBuilder text = new StringBuilder();
 			while(currentChar()!=null && !c.isTrue(this)){
@@ -178,9 +173,6 @@ public class GitRevisionInfo {
 			}
 			return text.toString();
 		}
-		
-		
-		
 	}
 	
 //	static class XYZ <T>{

@@ -54,9 +54,12 @@ class BzrP4ConduitE2ETest {
 	def startP4dAndWaitUntilItsReady(p4dDataDirectory:LocalPath) = {
 		var text = ""
 
-		var p = new ProcessBuilder("p4d", "-r", p4dDataDirectory.getAbsolutePath)
+		var process = new ProcessBuilder("p4d", "-r", p4dDataDirectory.getAbsolutePath)
 					.redirectErrorStream(true)
-					.start()
+		var env = process.environment()
+		env.put("P4PORT", "localhost:1666")
+					
+		val p = process.start()
 		val in = p.getInputStream()
 		val buffer = new Array[Byte](1024 * 1024)
 
