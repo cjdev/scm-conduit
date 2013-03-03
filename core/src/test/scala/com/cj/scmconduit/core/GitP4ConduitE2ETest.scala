@@ -18,6 +18,7 @@ import com.cj.scmconduit.core.util.CommandRunnerImpl
 import RichFile._
 import java.io.OutputStream
 import java.io.PrintStream
+import java.util.regex.Pattern
 
 class GitP4ConduitE2ETest {
   
@@ -381,6 +382,58 @@ class GitP4ConduitE2ETest {
         }
     }
 	
+    @Test
+    def rollbackShouldRemoveAllPendingChangelistsAndRollbackTheirFiles() {
+        runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+            
+            
+            
+            val aDotTxt = spec.localPath/"a.txt" 
+            
+            aDotTxt.write("hello world")
+            
+            
+            def createChangelist(changelistText:String, p4:P4):Integer = {
+                val output = p4.doCommand(new ByteArrayInputStream(changelistText.getBytes()), "changelist", "-i");
+                System.out.println(output);
+        
+                val txt = output
+                            .replaceAll(("created."), "")
+                            .replaceAll(("Change"), "")
+                            .trim();
+                System.out.println("Txt: " + txt);
+                
+                val changeListNum = Integer.parseInt(txt);
+                System.out.println("Found number " + changeListNum);
+                
+                return changeListNum;
+            }
+            
+            def createP4ChangelistWithMessage(message:String,  p4:P4):Integer = {
+                System.out.println("Changes:\n" + message);
+        
+                System.out.println("Creating changelist");
+        
+                val changelistText = p4.doCommand("changelist", "-o").replaceAll(Pattern.quote("<enter description here>"), message);
+        
+                val changeListNum = createChangelist(changelistText, p4);
+                return changeListNum;
+            }
+
+            val changelist = createP4ChangelistWithMessage("a pending changelist", p4(spec, shell))
+            
+            p4(spec, shell).doCommand("add", aDotTxt.getAbsolutePath(), "-c" + changelist)
+            
+            // when
+            conduit.rollback()
+            
+            // then
+            
+            val pendingChangelists = p4(spec, shell).doCommand("changes", "-s", "pending")
+            assertEquals("", pendingChangelists)
+        }
+    }
+    
 	@Test
 	def usersCanPushToABlankDepotThroughANewConduit() {
 		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>

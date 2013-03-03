@@ -24,6 +24,8 @@ import scala.collection.JavaConversions._
 import java.io.ByteArrayInputStream
 import RichFile._
 import com.cj.scmconduit.core.git.Git
+import java.io.BufferedReader
+import java.io.FileReader
 
 object GitP4Conduit {
   
@@ -83,6 +85,19 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	override def commit(using:P4Credentials) {}
 	
 	override def rollback() {
+	  
+	  
+        p4.doCommand("revert", "//...");
+        
+        val changes = p4.doCommand("changes", "-s", "pending");
+        
+        val lines = changes.split(Pattern.quote("\n"));
+        
+        lines.foreach{line=>
+          val parts = line.split(Pattern.quote(" "))
+          p4.doCommand("changelist", "-d", parts(1))
+        }
+	  
 		git.run("reset", "--hard");
 	}
 	
