@@ -94,8 +94,11 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
         val lines = changes.split(Pattern.quote("\n"));
         
         lines.foreach{line=>
-          val parts = line.split(Pattern.quote(" "))
-          p4.doCommand("changelist", "-d", parts(1))
+          if(!line.trim().isEmpty()){
+              val parts = line.split(Pattern.quote(" "))
+              val changelistNum = parts(1)
+              p4.doCommand("changelist", "-d", changelistNum)
+          }
         }
 	  
 		git.run("reset", "--hard");
