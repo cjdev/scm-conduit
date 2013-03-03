@@ -8,6 +8,10 @@
 
 	<name>${project.artifactId}</name>
 
+	<properties>
+		<scala-version>2.10.0</scala-version>
+	</properties>
+
 	<build>
 		<plugins>
 			<plugin>
