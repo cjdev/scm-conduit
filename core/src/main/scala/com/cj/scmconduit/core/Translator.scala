@@ -14,6 +14,7 @@ class Translator(private val p4:P4) {
 	def translate(info:GitRevisionInfo):Integer = {
 		val changeListNum = createP4ChangelistWithMessage(info.message, p4);
 		info.changes.foreach{change=>
+		  println(" Change for cl" + changeListNum + ":" + change.path);
 			change.kind match {
 			case ChangeType.A =>
 				p4.doCommand("add", "-c", changeListNum.toString(), change.path);

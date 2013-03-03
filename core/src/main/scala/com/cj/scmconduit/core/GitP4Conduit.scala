@@ -261,11 +261,12 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		}else{
 			val lines = IOUtils.readLines(new StringReader(missing)).asInstanceOf[List[String]];
 			
+			var lastRev = currentRev
 			lines.foreach{line=>
 				this.out.println("Need to fetch " + line);
 				val rev = line.replaceAll(Pattern.quote("+"), "").trim();
 				git.run("merge", rev);
-				val log = git.run("log", "--name-status", currentRev + ".." + rev,  "--pretty=medium");
+				val log = git.run("log", "--name-status", lastRev + ".." + rev,  "--pretty=medium");
 				this.out.println(log);
 				
 				val changes = new GitRevisionInfo(log);
@@ -281,7 +282,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 					  throw e
 				  }
 				}
-				
+				lastRev = rev
 				push()
 			}
 			

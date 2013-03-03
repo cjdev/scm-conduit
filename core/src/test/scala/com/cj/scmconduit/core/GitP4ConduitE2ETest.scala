@@ -276,6 +276,111 @@ class GitP4ConduitE2ETest {
 		}
 	}
 	
+	
+    @Test
+    def aGitPushThatContainsMultipleNewCommitsShouldTranslateToMultipleP4Changelists() {
+        runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+            
+            // GIVEN: A new conduit connected to a depot with an empty history, and a git branch with one change
+            val myclone = tempPath("myclone");
+            shell.run("git", "clone", spec.localPath, myclone)
+            
+            {
+                val newFile = myclone / "a.txt"
+                newFile.write("hello world")
+                runGit(shell, myclone, "add", "--all")
+                runGit(shell, myclone, "commit", "-m", "Added a.txt")
+            }
+            
+            {
+                val newFile = myclone / "b.txt"
+                newFile.write("hello world")
+                runGit(shell, myclone, "add", "--all")
+                runGit(shell, myclone, "commit", "-m", "Added b.txt")
+            }
+            
+            
+            {
+                val existingFile = myclone / "a.txt"
+                existingFile.write("yo yo yo")
+                runGit(shell, myclone, "add", "--all")
+                runGit(shell, myclone, "commit", "-m", "Edited a.txt")
+            }
+            
+            
+            {
+                val existingFile = myclone / "b.txt"
+                existingFile.write("yo yo yo")
+                runGit(shell, myclone, "add", "--all")
+                runGit(shell, myclone, "commit", "-m", "Edited b.txt")
+            }
+            // when: the change is submitted to the conduit
+            val changesFlowed = conduit.pull(myclone, new P4Credentials("larry", ""))
+            
+            // then: 
+            assertTrue("Some changes should make their way to perforce", changesFlowed)
+            
+            // there should be no p4 opened files
+            val openedFilesList = p4(spec, shell).doCommand("opened")
+            assertEquals("There should be no opened p4 files", "", openedFilesList)
+            
+            val changelists = p4(spec, shell).changesBetween(P4RevRangeSpec.everythingAfter(1));
+            println("CHANGELISTS: " + changelists.map(_.description()).toList.mkString("\n"))
+            assertEquals(4, changelists.size());
+            
+            {
+              val cl = changelists(0)
+              assertEquals("Added a.txt", cl.description)
+              val changes = p4(spec, shell).doCommand("describe", "-du", cl.id().toString)
+//              assertEquals("whatever", changes)
+              println(changes)
+            }
+            
+            {
+              val cl = changelists(1)
+              assertEquals("Added b.txt", cl.description)
+              val changes = p4(spec, shell).doCommand("describe", "-du", cl.id().toString)
+//              assertEquals("whatever", changes)
+              println(changes)
+            }
+             {
+              val cl = changelists(2)
+              assertEquals("Edited a.txt", cl.description)
+              val changes = new P4DescribeOutputParser().parse(p4(spec, shell).doCommand("describe", cl.id().toString))
+              assertEquals(1, changes.size())
+              val change = changes.get(0)
+              assertEquals("//depot/a.txt", change.depotPath);
+              assertEquals(2, change.fileVersion.intValue());
+              println(changes)
+            }
+             {
+              val cl = changelists(3)
+              assertEquals("Edited b.txt", cl.description)
+              val changes = new P4DescribeOutputParser().parse(p4(spec, shell).doCommand("describe", "-s", cl.id().toString))
+              assertEquals(1, changes.size())
+              println(changes)
+            }
+//            changelists.foreach {changelist=>
+//            }
+//            
+//            // it should be on the next p4 CL
+//            val haveAfter = p4(spec, shell).doCommand("have")
+//            println("Has: " + haveAfter)
+//            assertTrue("The have list for the client should have changed", haveBefore != haveAfter)
+//            assertTrue("The client should have the files", haveAfter.contains("//depot/file.txt#1"))
+//            
+//            // there should be no git changes
+//            val gitChanges = runGit(shell, myclone, "status", "-s")
+//            assertEquals("", gitChanges)
+//            
+//            println(runGit(shell, myclone, "fetch", "--tags")) // synchronize tags with remote git conduit
+//            val taggedRev = toString(new File(myclone, ".git/refs/tags/cl2")).trim()
+//            val currentRev = runGit(shell, myclone, "log", "-1", "--format=%H").trim()
+//            
+//            assertEquals(currentRev, taggedRev)
+        }
+    }
+	
 	@Test
 	def usersCanPushToABlankDepotThroughANewConduit() {
 		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
