@@ -30,6 +30,11 @@ button.deleteButton {
 div.error {
 	background:rgb(255, 182, 182);
 }
+
+.snippet {
+	margin:5px;
+}
+
 </style>
 </head>
 <body>
@@ -66,12 +71,14 @@ $(function(){
 			
 			var buttonId = 'deleteButton' + id; 
 			
-			var logoUrl;
+			var logoUrl, instructions;
 			
 			if(conduit.type==="GIT"){
 				logoUrl = "/Git-Icon-1788C.png";
+				instructions = "git clone " + conduit.sshUrl;
 			}else if(conduit.type==="BZR"){
 				logoUrl = "/bzr-icon-64.png";
+				instructions = "bzr branch " + conduit.sshUrl;
 			}else{
 				logoUrl = "";
 			}
@@ -79,15 +86,14 @@ $(function(){
 			$("#whatever").append('<div class="conduitbox ' + additionalWidgetClasses + '">' + 
 			'<div class="conduitLabel">' + conduit.name + 
 			'<img width="64" height="64" style="float:left;margin:5px;" src="' + logoUrl + '"/>' + 
-			'<span class="' + statusClasses + '" style="font-size:10pt;font-weight:normal;font-style:italic;"> [STATUS:' + conduit.status + ']' + 
+			'<span class="' + statusClasses + '" style="font-size:10pt;font-weight:normal;font-style:italic;"> [' + conduit.status + ']' + 
 			' <a href="' + conduit.logUrl + '">LOG</a> ' + 
+			'<a href="' + conduit.apiUrl + '">API</a>' + 
 			'<button class="deleteButton" id="' + buttonId + '">Delete</button>' + 
 			'</div>' + 
 			'<table>' + 
-			'	<tr><td class="label">Type:</td><td>git</td></tr>' + 
-			'	<tr><td class="label">Perforce Path:</td><td>' + conduit.p4path + '</td></tr>' + 
-			'	<tr><td class="label">API:</td><td>' + conduit.apiUrl + '</td></tr>' + 
-			'	<tr><td class="label">Read-Only:</td><td>' + conduit.readOnlyUrl + '</td></tr>' + 
+			'	<tr><td class="label">Perforce:</td><td>' + conduit.p4path + '</td></tr>' + 
+			'	<tr><td class="label"></td><td><pre class="snippet">' + instructions + '</pre></td></tr>' + 
 // 			'	<tr><td class="label">Read/Write:</td><td>ssh://build115.wl.cj.com:3433/</td></tr>' + 
 			'</table>' + 
 			'</div>');
@@ -114,6 +120,5 @@ $(function(){
 	});
 });
 </script>
-<div style="text-align:center;"><a href="/submit.py">submit.py</a></div>
 </body>
 </html>

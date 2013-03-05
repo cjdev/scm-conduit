@@ -3,13 +3,13 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.cj.scmconduit</groupId>
 	<artifactId>scm-conduit-pom</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.2.0-SNAPSHOT</version>
 	<packaging>pom</packaging>
 
 	<name>${project.artifactId}</name>
 
 	<properties>
-		<scala-version>2.10.0</scala-version>
+		<scala-version>2.9.1</scala-version>
 	</properties>
 
 	<build>

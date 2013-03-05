@@ -1,31 +1,20 @@
 package com.cj.scmconduit.server.conduit;
 
-import static java.lang.System.out;
-
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.sshd.SshServer;
-import org.apache.sshd.server.FileSystemFactory;
-import org.apache.sshd.server.FileSystemView;
-import org.apache.sshd.server.PasswordAuthenticator;
-import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider;
-import org.apache.sshd.server.session.ServerSession;
 
 import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.util.CommandRunner;
-import com.cj.scmconduit.server.ssh.SshFsView;
 
 public class PushSession {
 	public enum State {WAITING_FOR_INPUT, WORKING, FINISHED}
 	
 	public interface PushStrategy {
-		void prepareDestinationDirectory(URI publicUri, File conduitLocation, File codePath, CommandRunner shell);
+		void prepareDestinationDirectory(Integer sessionId, URI publicUri, File conduitLocation, File codePath, CommandRunner shell);
 		String constructPushUrl(String hostname, Integer port, String path);
 		void configureSshDaemon(SshServer sshd, final File path, int port);
 	}
@@ -34,26 +23,25 @@ public class PushSession {
 
 	private final Log log = LogFactory.getLog(getClass());
 	private final Integer pushId;
-	private final SshDaemon sshServer;
+	private final P4Credentials credentials;
+	
 	private final File onDisk;
 	private final String hostname;
 	private final PushStrategy strategy;
+	private final String conduitName;
 	
 	private boolean hadErrors = false;
 	private String explanation;
+
 	
-	private boolean isOpen = true;
-	
-	PushSession(Integer id, URI publicUri, File conduitLocation, File onDisk, PushStrategy strategy, CommandRunner shell) {
+	PushSession(String conduitName, Integer id, URI publicUri, File conduitLocation, File onDisk, PushStrategy strategy, CommandRunner shell, final P4Credentials credentials) {
+	    this.conduitName = conduitName;
 		this.pushId = id;
 		this.onDisk = onDisk;
 		this.hostname = publicUri.getHost();
 		this.strategy = strategy;
-		
-		this.sshServer = new SshDaemon(onDisk, pushId, strategy);
-		
-		
-		strategy.prepareDestinationDirectory(publicUri, conduitLocation, codePath(), shell);
+		this.credentials = credentials;
+		strategy.prepareDestinationDirectory(id, publicUri, conduitLocation, codePath(), shell);
 		
 	}
 	
@@ -77,7 +65,7 @@ public class PushSession {
 		state = State.FINISHED;
 		this.hadErrors = hasErrors;
 		this.explanation = explanation;
-		log.info(getClass().getSimpleName() + " is finished: " + state + "  " + explanation);
+		log.debug(getClass().getSimpleName() + " is finished: " + state + "  " + explanation);
 	}
 	
 	public void inputReceived(final Pusher pusher){
@@ -85,109 +73,38 @@ public class PushSession {
 		state = PushSession.State.WORKING;
 		log.info("Input received at " + codeLocation);
 		
-		if(sshServer.credentialsReceived.isEmpty()){
-			close();
-			markAsFinished(true, "No credentials received");
-		}else if(sshServer.credentialsReceived.size()>1 && !allAreEqual(sshServer.credentialsReceived)){
-			close();
-			markAsFinished(true, "I received more than one set of credentials .. not sure how to proceed");
-		} else {
-			final P4Credentials credentials = sshServer.credentialsReceived.get(0);
-			pusher.submitPush(codeLocation, credentials, new Pusher.PushListener() {
-				public void pushSucceeded() {
-					log.info("Push succeeded: " + explanation);
-					close();
-					markAsFinished(false, "IT WORKED");
-				}
-				public void nothingToPush() {
-					log.info("There was nothing to push");
-					close();
-					markAsFinished(false, "There was nothing to push");
-				}
-				public void pushFailed(String explanation) {
-					log.info("Push failed: " + explanation);
-					close();
-					markAsFinished(true, "THE PUSH FAILED: " + explanation);
-				}
-			});
-		}
+		pusher.submitPush(codeLocation, credentials, new Pusher.PushListener() {
+			public void pushSucceeded() {
+				log.info("Push succeeded: " + explanation);
+				close();
+				markAsFinished(false, "IT WORKED");
+			}
+			public void nothingToPush() {
+				log.info("There was nothing to push");
+				close();
+				markAsFinished(false, "There was nothing to push");
+			}
+			public void pushFailed(String explanation) {
+				log.info("Push failed: " + explanation);
+				close();
+				markAsFinished(true, "THE PUSH FAILED: " + explanation);
+			}
+		});
 	}
 	
-	private boolean allAreEqual(List<?> objects) {
-		Object previous = null;
-		for (Object next : objects) {
-			if(previous==null){
-				previous = next;
-			}else{
-				if(!next.equals(previous)){
-					return false;
-				}
-			}
-		}
-		return true;
-	}
-
 	private File codePath() {
-		return new File(onDisk, "code");
+		return new File(localPath(), conduitName);
 	}
 
 	synchronized void close(){
-		try {
-			sshServer.stop();
-			isOpen = false;
-		} catch (InterruptedException e) {
-			throw new RuntimeException(e);
-		}
-	}
-
-	public boolean isOpen() {
-		return isOpen;
 	}
 
 	public String sftpUrl(){
-		return strategy.constructPushUrl(hostname,  pushId, "/code");//"ssh://" + hostname + ":" + pushId + "/code";
+		return strategy.constructPushUrl(hostname,  pushId, "/code");
 	}
-	
-	public static class SshDaemon {
-		private final List<P4Credentials> credentialsReceived = new ArrayList<P4Credentials>();
-		private final SshServer sshd;
-		private final Log log = LogFactory.getLog(getClass());
-		
-		public SshDaemon(final File path, int port, PushStrategy strategy) { 
-			log.info("Serving " + path + " at port " + port);
-			try {
-				sshd = SshServer.setUpDefaultServer();
-				
-				sshd.setFileSystemFactory(new FileSystemFactory() {
-					public FileSystemView createFileSystemView(String userName) {
-						return new SshFsView("joe", false, path);
-					}
-				});
-				
-				sshd.setPort(port);
-				sshd.setKeyPairProvider(new SimpleGeneratorHostKeyProvider("hostkey.ser"));
-				sshd.setPasswordAuthenticator(new PasswordAuthenticator() {
-					
-					public boolean authenticate(String username, String password, ServerSession session) {
-						credentialsReceived.add(new P4Credentials(username, password));
-						return true;
-					}
-				});
-				
-				strategy.configureSshDaemon(sshd, path, port);
-				
-				sshd.start();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-			
-		}
 
-		public void stop() throws InterruptedException {
-			sshd.stop();
-		}
-		
-		
-	}
+    public File localPath() {
+        return onDisk;
+    }
 	
 }

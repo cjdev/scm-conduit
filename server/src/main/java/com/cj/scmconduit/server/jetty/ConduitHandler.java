@@ -1,7 +1,6 @@
 package com.cj.scmconduit.server.jetty;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -18,19 +17,6 @@ public class ConduitHandler extends HttpObject {
 	private final Log log;
 	public final String name;
 	private final ConduitController controller;
-	private final Map<String, SessionResource> sessions = new HashMap<String, ConduitHandler.SessionResource>();
-	
-	private class SessionResource {
-		final String restPath;
-		final PushSession session;
-		
-		private SessionResource(PushSession session) {
-			super();
-			this.restPath = name + "/" + ".scm-conduit-push-session-" + session.id();
-			this.session = session;
-		}
-		
-	}
 	
 	public ConduitHandler(String name, ConduitController controller) {
 		super(name + "/{remainder*}");
@@ -40,48 +26,27 @@ public class ConduitHandler extends HttpObject {
 	}
 
 	@Override
-	public Response post(Request req) {
-		String remainder = req.pathVars().valueFor("remainder");
-		if(remainder==null || remainder.equals("")){
-			log.info("Creating session");
-			
-			SessionResource session = new SessionResource(controller.newSession());
-			log.info("created session: " + session);
-			
-			sessions.put(session.restPath, session);
-			
-			return OK(Json("{\n" + 
-					"\"pushLocation\":\"" + session.session.sftpUrl() + "\",\n" + 
-					"\"resultLocation\":\"" + session.restPath + "\"\n" + 
-					"}"));
-		}else{
-			return BAD_REQUEST();
-		}
-	}
-	
-	
-	@Override
 	public Response get(Request req) {
-		String remainder = req.pathVars().valueFor("remainder");
-		String path = name + (remainder==null?"":("/" + remainder));	
-		
-		final SessionResource resource = sessions.get(path);
+		final String remainder = req.pathVars().valueFor("remainder");
+		final Integer sessionId = parseSessionId(remainder);
+		if(sessionId==null) return NOT_FOUND();
+		final PushSession session = controller.sessions().get(sessionId);
 		
 		final Response r;
 		
-		if(resource!=null){
-			final State state = resource.session.state();
+		if(session!=null){
+			final State state = session.state();
 			
 			if(state == PushSession.State.WAITING_FOR_INPUT){
-				resource.session.inputReceived(controller);
+				session.inputReceived(controller);
 				r = OK(Text("WORKING"));
 			}else if(state == PushSession.State.WORKING){
 				r = OK(Text("WORKING"));
 			}else if(state == PushSession.State.FINISHED){
-				if(resource.session.hadErrors()){
-					r = OK(Text("ERROR:" + resource.session.explanation()));
+				if(session.hadErrors()){
+					r = OK(Text("ERROR:" + session.explanation()));
 				}else{
-					r = OK(Text("OK:" + resource.session.explanation()));
+					r = OK(Text("OK:" + session.explanation()));
 				}
 			}else{
 				r = INTERNAL_SERVER_ERROR(Text("Unknown state: " + state));
@@ -92,5 +57,19 @@ public class ConduitHandler extends HttpObject {
 		
 		return r;
 	}
+
+    private Integer parseSessionId(String remainder) {
+        try {
+            String path = name + (remainder==null?"":("/" + remainder));	
+            
+            String[] parts = path.split(Pattern.quote("/"));
+            String p = parts[parts.length-1];
+            
+            final Integer sessionId = Integer.parseInt(p.replaceAll(Pattern.quote(".scm-conduit-push-session-"), ""));
+            return sessionId;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
 
 }

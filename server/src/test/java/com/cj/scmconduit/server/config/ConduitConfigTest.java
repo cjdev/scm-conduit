@@ -58,7 +58,6 @@ public class ConduitConfigTest {
 		orig.path = new File("");
 		
 		String xml = marshal(orig);
-		System.out.println(xml);
 		
 		Config copy = unmarshal(xml);
 

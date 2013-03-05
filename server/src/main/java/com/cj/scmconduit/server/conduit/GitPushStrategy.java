@@ -1,15 +1,25 @@
 package com.cj.scmconduit.server.conduit;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.util.regex.Pattern;
 
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.mina.core.session.IoSession;
 import org.apache.sshd.SshServer;
 import org.apache.sshd.server.Command;
 import org.apache.sshd.server.CommandFactory;
+import org.apache.sshd.server.Environment;
+import org.apache.sshd.server.ExitCallback;
 import org.apache.sshd.server.command.ScpCommandFactory;
+import org.apache.sshd.server.session.SessionFactory;
 import org.apache.sshd.server.shell.ProcessShellFactory;
 
 import com.cj.scmconduit.core.util.CommandRunner;
@@ -17,10 +27,26 @@ import com.cj.scmconduit.server.conduit.PushSession.PushStrategy;
 
 public class GitPushStrategy implements PushStrategy {
 	private final Log log = LogFactory.getLog(getClass());
+	private final String conduitName;
 	
-	@Override
-	public void prepareDestinationDirectory(URI publicUri, File conduitLocation, File codePath, CommandRunner shell) {
+	public GitPushStrategy(String conduitName) {
+        super();
+        this.conduitName = conduitName;
+    }
+
+    @Override
+	public void prepareDestinationDirectory(Integer sessionId, URI publicUri, File conduitLocation, File codePath, CommandRunner shell) {
 		shell.run("git", "clone", "--bare", conduitLocation.getAbsolutePath() + "/.git", codePath.getAbsolutePath());
+		  try {
+            File pathToHook = new File(codePath, "hooks/post-receive");
+              log.debug("WRiting post-receive hook to " + pathToHook.getAbsolutePath());
+              String script = IOUtils.toString(getClass().getResourceAsStream("/com/cj/scmconduit/post-receive.py"));
+              script = script.replaceAll("THE_REPO", publicUri.toASCIIString() + "/.scm-conduit-push-session-" + sessionId);
+              FileUtils.writeStringToFile(pathToHook, script);
+              pathToHook.setExecutable(true);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 	}
 	
 	@Override
@@ -30,16 +56,16 @@ public class GitPushStrategy implements PushStrategy {
 	
 	@Override
 	public void configureSshDaemon(SshServer sshd, final File path, int port) {
+	    
+	    
 		sshd.setShellFactory(new ProcessShellFactory(new String[] { "/bin/sh", "-i", "-l" }));
-		
 		sshd.setCommandFactory(new ScpCommandFactory(new CommandFactory() {
+		    
 			@Override
 			public Command createCommand(String command) {
-				
-				log.info("YO: I was asked to create this command: " + command);
-				command = command.replaceAll(Pattern.quote("'/code'"), new File(path, "code").getAbsolutePath());
-				log.info("I changed the command to " + command);
-				return new ProcessShellFactory(command.split(Pattern.quote(" "))).create();
+
+               
+                    return new ShellCommand(command, conduitName);
 			}
 		}));
 		

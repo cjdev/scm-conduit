@@ -18,7 +18,6 @@ public class GitStatus {
 			BufferedReader reader = new BufferedReader(new StringReader(text));
 			
 			for(String line = reader.readLine();line!=null;line = reader.readLine()){
-//				System.out.println("next line: " + line);
 				if(line.startsWith(UNKNOWN_TOKEN)){
 					String file = line.substring(UNKNOWN_TOKEN.length());
 					modifications.add(new GitFileStatus(null, null, file));
@@ -56,8 +55,6 @@ public class GitStatus {
 					} else {
 						throw new RuntimeException("Unable to interpret beginning of line");
 					}
-					
-//					System.out.println("Detected '" + indexOp + "' and '" + unstagedOp + "' and file of " + file);
 					
 					StatusCode stagedStatus = statusCodeFor(indexOp);
 					StatusCode unStagedStatus = statusCodeFor(unstagedOp);

@@ -47,11 +47,14 @@ public class SshFsView implements FileSystemView {
         LOG.debug("Native filesystem view created for user \"{}\" with root \"{}\"", userName, currDir);
     }
 
-    /**
-     * Get file object.
-     */
+    
+    @Override
+    public SshFile getFile(SshFile baseDir, String file) {
+        return getFile(file);
+    }
+    @Override
     public SshFile getFile(String file) {
-
+        
         // get actual file object
         String physicalName = NativeSshFile.getPhysicalName("/",
                 currDir, file, caseInsensitive);

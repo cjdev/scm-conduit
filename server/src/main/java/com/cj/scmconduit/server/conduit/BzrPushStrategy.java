@@ -16,7 +16,7 @@ import com.cj.scmconduit.server.conduit.PushSession.PushStrategy;
 public class BzrPushStrategy implements PushStrategy {
 
 	@Override
-	public void prepareDestinationDirectory(URI publicUri, File conduitLocation, File codePath, CommandRunner shell) {
+	public void prepareDestinationDirectory(Integer sessionId, URI publicUri, File conduitLocation, File codePath, CommandRunner shell) {
 		new Bzr(shell).createStackedBranch(publicUri.toString(), codePath.getAbsolutePath());
 	}
 	

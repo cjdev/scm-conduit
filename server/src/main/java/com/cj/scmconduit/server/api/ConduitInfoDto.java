@@ -7,6 +7,7 @@ public class ConduitInfoDto {
 	public ConduitState status;
 	public Integer queueLength;
 	public Integer backlogSize;
+	public String sshUrl;
 	public Long currentP4Changelist;
 	public String error;
 	public ConduitType type;

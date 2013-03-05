@@ -27,7 +27,6 @@ public class P4DescribeOutputParser {
 	}
 	
 	public List<Change> parse(String text){
-	    System.out.println(text);
 	    return parse(new StringReader(text));
 	}
 	

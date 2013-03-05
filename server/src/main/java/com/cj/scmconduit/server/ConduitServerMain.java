@@ -2,14 +2,15 @@ package com.cj.scmconduit.server;
 
 import static org.httpobjects.jackson.JacksonDSL.JacksonJson;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintStream;
-import java.io.PrintWriter;
+import java.io.Writer;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,12 +21,9 @@ import java.util.regex.Pattern;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.log4j.Appender;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
-import org.apache.log4j.RollingFileAppender;
 import org.httpobjects.HttpObject;
 import org.httpobjects.Request;
 import org.httpobjects.Response;
@@ -63,7 +61,6 @@ import com.cj.scmconduit.server.jetty.ConduitHandler;
 import com.cj.scmconduit.server.jetty.VFSResource;
 import com.cj.scmconduit.server.util.SelfResettingFileOutputStream;
 
-
 public class ConduitServerMain {
 	public static void main(String[] args) throws Exception {
 		try {
@@ -80,17 +77,9 @@ public class ConduitServerMain {
 	}
 
 	private static void setupLogging() {
-//		try {
-			BasicConfigurator.resetConfiguration();
-			BasicConfigurator.configure();
-//			RollingFileAppender a = new RollingFileAppender(
-//										new PatternLayout("%p %t %c - %m%n"), 
-//										"scm-conduit.log");
-//			Logger.getRootLogger().addAppender(a);
-			Logger.getRootLogger().setLevel(Level.INFO);
-//		} catch (IOException e) {
-//			throw new RuntimeException(e);
-//		}
+		BasicConfigurator.resetConfiguration();
+		BasicConfigurator.configure();
+		Logger.getRootLogger().setLevel(Level.INFO);
 	}
 
 	private static void doBzrSafetyCheck() {
@@ -118,11 +107,13 @@ public class ConduitServerMain {
 	private final List<ConduitCreationThread> creationThreads = new ArrayList<ConduitServerMain.ConduitCreationThread>();
 	private final Log log;
 	private final Config config;
+	private final String publicHostname;
 	
 	public ConduitServerMain(final Config config) throws Exception {
 		this.log = LogFactory.getLog(getClass());
 		this.config = config;
 		this.path = config.path;
+		this.publicHostname = config.publicHostname;
 		this.tempDirPath = new File(this.path, "tmp");
 		
 		mkdirs(this.tempDirPath);
@@ -170,7 +161,7 @@ public class ConduitServerMain {
 				ConduitStuff foundConduit = null;
 				for (ConduitStuff conduit : conduits) {
 					final String next = conduit.handler.name;
-					log.info("name: " + next);
+					log.debug("name: " + next);
 					if (conduitName.equals(next)) {
 						foundConduit = conduit;
 					}
@@ -430,15 +421,15 @@ public class ConduitServerMain {
 	}
 	
 	class ConduitConfig {
-		
+	    public final String name;
 		public final String hostingPath;
-		
 		public final File localPath;
 		
 		private ConduitConfig(String hostingPath, File localPath) {
 			super();
 			this.hostingPath = hostingPath;
 			this.localPath = localPath;
+			this.name = localPath.getName();
 		}
 		
 	}
@@ -487,7 +478,7 @@ public class ConduitServerMain {
 			final ConduitStuff conduit = this;
 			final ConduitInfoDto dto = new ConduitInfoDto();
 			dto.readOnlyUrl = basePublicUrl + conduit.config.hostingPath + (new File(conduit.config.localPath, ".git").exists()?"/.git":"");
-			dto.apiUrl = basePublicUrl + conduit.config.hostingPath;
+			dto.apiUrl = basePublicUrl + "/api/conduits" + conduit.config.hostingPath ;
 			dto.p4path = conduit.p4path;
 			dto.name = conduit.config.localPath.getName();
 			dto.queueLength = conduit.controller.queueLength();
@@ -497,15 +488,73 @@ public class ConduitServerMain {
 			dto.error = conduit.controller.error();
 			dto.type = conduit.controller.type();
 			dto.logUrl = basePublicUrl + "/api/conduits" + conduit.config.hostingPath + "/log";
-			
+			dto.sshUrl = "ssh://" + publicHostname + ":" + sshPortForConduitNamed(conduit.config.name) + "/" + conduit.config.name;
 			return dto;
 		}
 	}
 	
+	private synchronized Map<Integer, String> portAssignments(){
+	    try { 
+            final Map<Integer, String> result = new HashMap<Integer, String>();
+            final File path = portAssignmentsFile();
+            if(path.exists()){
+                final BufferedReader reader = new BufferedReader(new FileReader(path));
+                String line;
+                while((line=reader.readLine())!=null){
+                    final String[] parts = line.split(Pattern.quote("="));
+                    result.put(Integer.parseInt(parts[0]), parts[1]);
+                }
+                reader.close();
+            }
+            
+            return result;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+	}
+
+    private File portAssignmentsFile() {
+        return new File(tempDirPath, "ports.txt");
+    }
+	
+	private synchronized Integer sshPortForConduitNamed(final String name){
+	    Map<Integer, String> pas = portAssignments();
+
+        for(Map.Entry<Integer, String> entry : pas.entrySet()){
+            if(entry.getValue().equals(name)){
+                return entry.getKey();
+            }
+        }
+        
+	    Integer port=6000;
+	    while(port<7000){
+	        if(!pas.containsKey(port)){
+	            break;
+	        }
+	        port++;
+	    }
+	    if(port==7000) throw new RuntimeException("No free ports!?");
+	    
+	    log.info("Assigned port " + port + " to " + name);
+	    pas.put(port, name);
+	    
+	    try {
+            Writer writer = new FileWriter(portAssignmentsFile());
+            for(Map.Entry<Integer, String> entry : pas.entrySet()){
+                writer.write(entry.getKey() + "=" + entry.getValue() + "\n");
+            }
+            writer.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+	    
+	    return port;
+	}
+	
 	private ConduitStuff prepareConduit(final String basePublicUrl, VFSResource root, TempDirAllocator allocator, ConduitConfig conduit) {
-		URI publicUri = URI(basePublicUrl + conduit.hostingPath);
-		ConduitLog log = logStreamForConduit(conduit.localPath.getName());
-		ConduitController controller = new ConduitController(log.stream, publicUri, conduit.localPath, allocator);
+		final URI publicUri = URI(basePublicUrl + conduit.hostingPath);
+		final ConduitLog log = logStreamForConduit(conduit.localPath.getName());
+		ConduitController controller = new ConduitController(conduit.name, log.stream, publicUri, sshPortForConduitNamed(conduit.name), conduit.localPath, allocator);
 		controller.start();
 		
 		ConduitHandler handler = new ConduitHandler(conduit.hostingPath, controller);
