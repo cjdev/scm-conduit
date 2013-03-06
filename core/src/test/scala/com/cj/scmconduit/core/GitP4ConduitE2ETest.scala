@@ -19,6 +19,7 @@ import RichFile._
 import java.io.OutputStream
 import java.io.PrintStream
 import java.util.regex.Pattern
+import java.io.InputStream
 
 class GitP4ConduitE2ETest {
   
@@ -246,14 +247,16 @@ class GitP4ConduitE2ETest {
 		  runGit(shell, branch, "add", "README.md")
 		  runGit(shell, branch, "commit", "-m", "I think I'm a bee")
 		  
+		  val larrysCredentials = new P4Credentials("larry", "")
+		  
 		  // WHEN:
 		  // the conduit is asked to push the conflicting history through to perforce
 		  val error = try {
-			  conduit.pull(branch, new P4Credentials("larry", ""))
+			  conduit.pull(branch, larrysCredentials)
 			  null
 		  }catch{
 		    case e:Throwable=> {
-		      conduit.rollback()
+		      conduit.rollback(larrysCredentials)
 		      e
 		    } 
 		  }
@@ -381,17 +384,56 @@ class GitP4ConduitE2ETest {
 //            assertEquals(currentRev, taggedRev)
         }
     }
-	
+    class MockShell (commandOutput:String) extends CommandRunner {
+        val commands = new scala.collection.mutable.ListBuffer[String]()
+        
+        private def record(command:String, args:String*):String = {
+          val t = command :: args.toList
+          
+          commands.add(t.mkString(" "))
+          commandOutput
+        }
+        override def run(command:String , args:String*):String = record(command, args:_*)
+        override def run(in:InputStream, command:String , args:String*):String = record(command, args:_*)
+        override def runWithHiddenKey(command:String , hideKey: String, args:String*):String = record(command, args:_*)
+        override def runWithHiddenKey(in:InputStream, hideKey: String, command:String , args:String*):String = record(command, args:_*)
+    }
+    
     @Test
-    def rollbackShouldRemoveAllPendingChangelistsAndRollbackTheirFiles() {
+    def checksForPendingChangelistsBeforeDoingAnythingElse() {
         runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
             
             
+            // given
+            
+            val myclone = tempPath("myclone");
+            shell.run("git", "clone", spec.localPath, myclone)
+            val mockShell = new MockShell("output-from-command")
+            
+            val conduit = new GitP4Conduit(spec.localPath, mockShell, System.out)
+            
+            // when
+            val errorThrown = try{
+              conduit.pull(myclone, new P4Credentials("larry", ""))
+              None
+            }catch{
+              case e:Throwable => Some(e)
+            }
+            
+            // then
+            assertTrue(errorThrown.isDefined)
+            assertEquals("p4 -c larrys-client -d " + spec.localPath.getAbsolutePath() + " -p localhost:1666 -u larry changes -s pending", mockShell.commands.mkString("\n"))
+            assertEquals("There are pending changelists:\noutput-from-command", errorThrown.get.getMessage());
+        }
+    }
+	
+    @Test
+    def rollbackShouldRemoveTheUsersPendingChangelistAndRollbackTheirFiles() {
+        runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
             
             val aDotTxt = spec.localPath/"a.txt" 
             
             aDotTxt.write("hello world")
-            
             
             def createChangelist(changelistText:String, p4:P4):Integer = {
                 val output = p4.doCommand(new ByteArrayInputStream(changelistText.getBytes()), "changelist", "-i");
@@ -419,13 +461,16 @@ class GitP4ConduitE2ETest {
                 val changeListNum = createChangelist(changelistText, p4);
                 return changeListNum;
             }
-
-            val changelist = createP4ChangelistWithMessage("a pending changelist", p4(spec, shell))
+            createUser(new UserSpec(id="bob", email="bob@host.com", fullName = "Robert"), shell)
+            val credentials = new P4Credentials("bob", "");
+            val p4AsBob = p4(spec, shell, credentials) 
             
-            p4(spec, shell).doCommand("add", aDotTxt.getAbsolutePath(), "-c" + changelist)
+            val changelist = createP4ChangelistWithMessage("a pending changelist", p4AsBob)
+            
+            p4AsBob.doCommand("add", aDotTxt.getAbsolutePath(), "-c" + changelist)
             
             // when
-            conduit.rollback()
+            conduit.rollback(credentials)
             
             // then
             
@@ -537,9 +582,13 @@ class GitP4ConduitE2ETest {
 		}
 	}
 	
+	private def createUser(userSpec:UserSpec, shell:CommandRunner) {
+        shell.run(new ByteArrayInputStream(userSpec.toString.getBytes()), "p4", "-p", "localhost:1666", "user", "-i", "-f")
+	}
+	
 	private def createP4Workspace(userName:String, where:LocalPath, shell:CommandRunner) = {
 		val userSpec = new UserSpec(id=userName, email=userName+"@host.com", fullName = userName)
-		shell.run(new ByteArrayInputStream(userSpec.toString.getBytes()), "p4", "-p", "localhost:1666", "user", "-i", "-f")
+		createUser(userSpec, shell)//shell.run(new ByteArrayInputStream(userSpec.toString.getBytes()), "p4", "-p", "localhost:1666", "user", "-i", "-f")
 		val sallysSpec = new ClientSpec(
 				localPath = realDirectory(where),
 				owner = userName,
@@ -625,7 +674,14 @@ class GitP4ConduitE2ETest {
 		p
 	}
 	
-	def p4(spec:ClientSpec, shell:CommandRunner)= new P4Impl(new P4DepotAddress("localhost:1666"), new P4ClientId(spec.clientId), new P4Credentials(spec.owner, "PASSWORD_YOU_SHOULDNT_SEE"), spec.localPath, shell);
+	def p4(spec:ClientSpec, shell:CommandRunner, maybeCredentials:P4Credentials = null) = {
+	  val credentials = if(maybeCredentials==null){
+	    new P4Credentials(spec.owner, "PASSWORD_YOU_SHOULDNT_SEE")
+	  }else{
+	    maybeCredentials
+	  }
+	    new P4Impl(new P4DepotAddress("localhost:1666"), new P4ClientId(spec.clientId), credentials, spec.localPath, shell); 
+	}
 	
 	def runGit(shell:CommandRunner, dir:LocalPath, args:String*) = {
 	    val gitDir = new LocalPath(dir, ".git") 

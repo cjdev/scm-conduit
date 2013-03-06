@@ -84,9 +84,9 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 
 	override def commit(using:P4Credentials) {}
 	
-	override def rollback() {
+	override def rollback(using:P4Credentials) {
 	  
-	  
+	    val p4 = p4ForUser(using)
         p4.doCommand("revert", "//...");
         
         val changes = p4.doCommand("changes", "-s", "pending");
@@ -255,7 +255,17 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 			shell);
 	}
 	
+	private def verifyNoPendingChangelists(){
+	    val changes = p4.doCommand("changes", "-s", "pending");
+	    if(!changes.trim().isEmpty()){
+	      throw new RuntimeException("There are pending changelists:\n" + changes)
+	    }
+	}
+	
 	override def pull(source:String, using:P4Credentials):Boolean = {
+	  
+	    verifyNoPendingChangelists();
+	  
 	    val incomingBranchName = "incoming"
 	  
 		try{

@@ -212,8 +212,8 @@ public class ConduitController implements Pusher {
 	}
 	
 	private void handle(PushRequest request) {
+        final P4Credentials credentials = request.credentials;
 		try {
-			final P4Credentials credentials = request.credentials;
 			String source = request.location.getAbsolutePath();
 			out.println("Pulling from " + source);
 			
@@ -233,7 +233,7 @@ public class ConduitController implements Pusher {
 			errors.add(e);
 			
 			try{
-				conduit.rollback();
+				conduit.rollback(credentials);
 			}catch(Throwable e2){
 				e2.printStackTrace();
 				errors.add(e2);

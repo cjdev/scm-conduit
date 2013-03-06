@@ -194,7 +194,7 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 
 	private def findLastSyncRevision() = state().lastSyncedP4Changelist
 
-	def rollback() {
+	override def rollback(using:P4Credentials) {
 		//		BzrStatus s = BzrStatus.read(runBzr("xmlstatus"));
 		p4.doCommand("revert", "//...");
 		runBzr("revert");
