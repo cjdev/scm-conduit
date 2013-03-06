@@ -1,25 +1,17 @@
 package com.cj.scmconduit.server.conduit;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.URI;
-import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.mina.core.session.IoSession;
 import org.apache.sshd.SshServer;
 import org.apache.sshd.server.Command;
 import org.apache.sshd.server.CommandFactory;
-import org.apache.sshd.server.Environment;
-import org.apache.sshd.server.ExitCallback;
 import org.apache.sshd.server.command.ScpCommandFactory;
-import org.apache.sshd.server.session.SessionFactory;
 import org.apache.sshd.server.shell.ProcessShellFactory;
 
 import com.cj.scmconduit.core.util.CommandRunner;
@@ -47,11 +39,6 @@ public class GitPushStrategy implements PushStrategy {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-	}
-	
-	@Override
-	public String constructPushUrl(String hostname, Integer port, String path) {
-		return "ssh://" + hostname + ":" + port + "/code";
 	}
 	
 	@Override

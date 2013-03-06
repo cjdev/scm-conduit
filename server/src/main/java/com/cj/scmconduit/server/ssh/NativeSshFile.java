@@ -19,10 +19,6 @@
  */
 package com.cj.scmconduit.server.ssh;
 
-import org.apache.sshd.server.SshFile;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -36,6 +32,10 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.StringTokenizer;
+
+import org.apache.sshd.server.SshFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * <strong>Internal class, do not use directly.</strong>

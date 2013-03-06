@@ -31,7 +31,6 @@ import com.cj.scmconduit.server.fs.TempDirAllocator;
 public class ConduitController implements Pusher {
     private final Log log = LogFactory.getLog(getClass());
 	private final PrintStream out;
-	private final Integer sshPort;
 	private final URI publicUri;
 	private final File pathOnDisk;
 	private final List<PushRequest> requests = new LinkedList<PushRequest>();
@@ -52,7 +51,6 @@ public class ConduitController implements Pusher {
 		this.out = out;
 		this.shell = new CommandRunnerImpl(out, out);
 		this.publicUri = publicUri;
-		this.sshPort = sshPort;
 		this.pathOnDisk = pathOnDisk;
 		this.temps = temps;
 		
@@ -68,7 +66,7 @@ public class ConduitController implements Pusher {
 			throw new RuntimeException("Not sure what kind of conduit this is: " + pathOnDisk);
 		}
 		
-		SshDaemon ssh = new SshDaemon(sshPort, new SshDaemon.SessionHandler() {
+		new SshDaemon(sshPort, new SshDaemon.SessionHandler() {
             @Override
             public PushSession prepareSessionFor(P4Credentials credentials, Session session) {
                 PushSession psession = newSession(credentials);

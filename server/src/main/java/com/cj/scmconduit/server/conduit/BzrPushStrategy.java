@@ -21,11 +21,6 @@ public class BzrPushStrategy implements PushStrategy {
 	}
 	
 	@Override
-	public String constructPushUrl(String hostname, Integer port, String path) {
-		return "sftp://" + hostname + ":" + port + "/code";
-	}
-	
-	@Override
 	public void configureSshDaemon(SshServer sshd, File path, int port) {
 		sshd.setSubsystemFactories(new LinkedList<NamedFactory<Command>>());
 		sshd.getSubsystemFactories().add(new SftpSubsystem.Factory());

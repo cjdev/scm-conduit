@@ -33,9 +33,6 @@ class Translator(private val p4:P4) {
 	
 
 	private def createP4ChangelistWithMessage(message:String,  p4:P4):Integer = {
-		System.out.println("Changes:\n" + message);
-
-		System.out.println("Creating changelist");
 
 		val changelistText = p4.doCommand("changelist", "-o").replaceAll(Pattern.quote("<enter description here>"), message);
 
@@ -45,16 +42,13 @@ class Translator(private val p4:P4) {
 
 	private def createChangelist(changelistText:String, p4:P4):Integer = {
 		val output = p4.doCommand(new ByteArrayInputStream(changelistText.getBytes()), "changelist", "-i");
-		System.out.println(output);
 
 		val txt = output
 					.replaceAll(("created."), "")
 					.replaceAll(("Change"), "")
 					.trim();
-		System.out.println("Txt: " + txt);
 		
 		val changeListNum = Integer.parseInt(txt);
-		System.out.println("Found number " + changeListNum);
 		
 		return changeListNum;
 	}

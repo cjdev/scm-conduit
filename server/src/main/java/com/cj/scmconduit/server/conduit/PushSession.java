@@ -15,7 +15,6 @@ public class PushSession {
 	
 	public interface PushStrategy {
 		void prepareDestinationDirectory(Integer sessionId, URI publicUri, File conduitLocation, File codePath, CommandRunner shell);
-		String constructPushUrl(String hostname, Integer port, String path);
 		void configureSshDaemon(SshServer sshd, final File path, int port);
 	}
 	
@@ -26,20 +25,15 @@ public class PushSession {
 	private final P4Credentials credentials;
 	
 	private final File onDisk;
-	private final String hostname;
-	private final PushStrategy strategy;
 	private final String conduitName;
 	
 	private boolean hadErrors = false;
 	private String explanation;
 
-	
 	PushSession(String conduitName, Integer id, URI publicUri, File conduitLocation, File onDisk, PushStrategy strategy, CommandRunner shell, final P4Credentials credentials) {
 	    this.conduitName = conduitName;
 		this.pushId = id;
 		this.onDisk = onDisk;
-		this.hostname = publicUri.getHost();
-		this.strategy = strategy;
 		this.credentials = credentials;
 		strategy.prepareDestinationDirectory(id, publicUri, conduitLocation, codePath(), shell);
 		
@@ -97,10 +91,6 @@ public class PushSession {
 	}
 
 	synchronized void close(){
-	}
-
-	public String sftpUrl(){
-		return strategy.constructPushUrl(hostname,  pushId, "/code");
 	}
 
     public File localPath() {
