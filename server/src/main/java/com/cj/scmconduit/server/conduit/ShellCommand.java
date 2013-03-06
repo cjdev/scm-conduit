@@ -19,22 +19,10 @@ public class ShellCommand implements Command, SessionAware{
     public static final AttributeKey<File> LOCAL_PATH = new AttributeKey<File>();
     
     public static void main(String[] args) throws Exception {
-        Command c = new ShellCommand("cat", "whatever");
-        c.setOutputStream(System.out);
-        c.setErrorStream(System.err);
-        c.setInputStream(System.in);
-        c.setExitCallback(new ExitCallback() {
 
-            @Override
-            public void onExit(int exitValue, String exitMessage) {
-            }
-
-            @Override
-            public void onExit(int exitValue) {
-                onExit(exitValue, null);
-            }
-        });
-        c.start(null);
+        Process p = Runtime.getRuntime().exec("cat");
+        
+        System.out.println("Exited with " + new ShellProcess(p, System.out, System.err, System.in).waitFor());
     }
     
     private final Log log = LogFactory.getLog(getClass());
@@ -92,8 +80,10 @@ public class ShellCommand implements Command, SessionAware{
         }.start();
     }
     private String toString(Environment env) {
-        for(String key : env.getEnv().keySet()){
-           log.debug(key + ":" + env.getEnv().get(key));
+        if(env!=null && log.isDebugEnabled()){
+            for(String key : env.getEnv().keySet()){
+                log.debug(key + ":" + env.getEnv().get(key));
+            }
         }
         return null;
     }
@@ -123,10 +113,10 @@ public class ShellCommand implements Command, SessionAware{
             super();
             this.p = p;
             
-            stdOut = new StreamConduit("stdout", p.getInputStream(), outputSink);
-            stdErr = new StreamConduit("stderr", p.getErrorStream(), errOutputSink);
+            stdOut = new StreamConduit("stdout", p.getInputStream(), outputSink, 1024);
+            stdErr = new StreamConduit("stderr", p.getErrorStream(), errOutputSink, 1024);
             if(input!=null){
-                stdIn = new StreamConduit("stdin", input, p.getOutputStream());
+                stdIn = new StreamConduit("stdin", input, p.getOutputStream(), 1);
             }
         }
         
@@ -149,12 +139,14 @@ public class ShellCommand implements Command, SessionAware{
         private final InputStream in;
         private final OutputStream out;
         private final String name;
+        private final int bufferSize;
         
-        public StreamConduit(String name, InputStream in, OutputStream out) {
+        public StreamConduit(String name, InputStream in, OutputStream out, int bufferSize) {
             super();
             this.in = in;
             this.out = out;
             this.name = name;
+            this.bufferSize = bufferSize;
             start();
         }
         
@@ -162,26 +154,23 @@ public class ShellCommand implements Command, SessionAware{
         public void run() {
             
             try {
+                byte[] buffer = new byte[bufferSize];
                 while(true){
-                    if(name.equals("stdin")){
-                            int bite = in.read();
-                            if(bite==-1){
+                        int avail = in.available();
+                            final int n;;
+                            if(avail==0){
+                                n = bufferSize;
+                            }else {
+                                n = Math.min(avail, bufferSize);
+                            }
+                            int numRead = in.read(buffer, 0, n);
+                            
+                            if(numRead==-1){
                                 break;
                             }else{
-                                out.write(bite);
+                                out.write(buffer, 0, numRead);
                                 out.flush();
                             }
-                    }else{
-                        int bite = in.read();
-                        if(bite==-1){
-                            break;
-                        }else{
-                            out.write(bite);
-                            out.flush();
-                        }
-                        
-                    }
-                    
                 }
                 if(in!=System.in) in.close();
                 if(out!=System.out && out!=System.err) out.close();

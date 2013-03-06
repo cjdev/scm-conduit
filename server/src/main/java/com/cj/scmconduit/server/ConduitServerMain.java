@@ -514,7 +514,7 @@ public class ConduitServerMain {
 	}
 
     private File portAssignmentsFile() {
-        return new File(tempDirPath, "ports.txt");
+        return new File(path, "ports.txt");
     }
 	
 	private synchronized Integer sshPortForConduitNamed(final String name){
