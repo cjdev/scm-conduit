@@ -185,7 +185,7 @@ public class ConduitController implements Pusher {
 							out.println("Sleeping");
 							state = ConduitState.IDLE;
 							synchronized(requests){
-							    requests.wait(10000);
+							    requests.wait(5000);
 							}
 							out.println("Waking-up");
 						}
