@@ -89,7 +89,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	    val p4 = p4ForUser(using)
         p4.doCommand("revert", "//...");
         
-        val changes = p4.doCommand("changes", "-s", "pending");
+        val changes = pendingChangesForThisP4Workspace()
         
         val lines = changes.split(Pattern.quote("\n"));
         
@@ -120,6 +120,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	}
 	
 	override def push() {
+        assertNoPendingChangelists();
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
 		
 		val p4LatestBranchName = "p4-incoming"
@@ -255,8 +256,12 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 			shell);
 	}
 	
-	private def verifyNoPendingChangelists(){
-	    val changes = p4.doCommand("changes", "-s", "pending");
+	private def pendingChangesForThisP4Workspace() = p4.doCommand("changes", "-c", state().getP4ClientId, "-s", "pending");
+	
+	private def assertNoPendingChangelists(){
+	  
+        val changes = pendingChangesForThisP4Workspace()
+        
 	    if(!changes.trim().isEmpty()){
 	      throw new RuntimeException("There are pending changelists:\n" + changes)
 	    }
@@ -264,7 +269,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	
 	override def pull(source:String, using:P4Credentials):Boolean = {
 	  
-	    verifyNoPendingChangelists();
+	    assertNoPendingChangelists();
 	  
 	    val incomingBranchName = "incoming"
 	  

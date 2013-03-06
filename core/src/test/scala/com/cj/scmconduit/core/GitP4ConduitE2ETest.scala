@@ -422,7 +422,7 @@ class GitP4ConduitE2ETest {
             
             // then
             assertTrue(errorThrown.isDefined)
-            assertEquals("p4 -c larrys-client -d " + spec.localPath.getAbsolutePath() + " -p localhost:1666 -u larry changes -s pending", mockShell.commands.mkString("\n"))
+            assertEquals("p4 -c larrys-client -d " + spec.localPath.getAbsolutePath() + " -p localhost:1666 -u larry changes -c "+ spec.clientId +" -s pending", mockShell.commands.mkString("\n"))
             assertEquals("There are pending changelists:\noutput-from-command", errorThrown.get.getMessage());
         }
     }
