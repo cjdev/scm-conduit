@@ -3,14 +3,13 @@ import sys
 import os
 import commands
 import httplib
-import json
 import time
 from urlparse import urlparse
 
 def exit_with(msg):
     """ Exit with a non-zero status and print a message to stdout """
     print(msg)
-    exit(1)
+    sys.exit(1)
 
 
 def request(url, method):
