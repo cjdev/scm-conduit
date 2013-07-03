@@ -67,6 +67,22 @@ public class PushSession {
 		state = PushSession.State.WORKING;
 		log.info("Input received at " + codeLocation);
 		
+		/*
+		 * if(hookUrl){
+		 *    expose push session via ssh
+		 *    post message to hookUrl:
+		 *       {
+		 *           "url":"sftp://fobar.com:343/myUrl"
+		 *       }
+		 *    expect 3xx response
+		 *    Poll LOCATION
+		 *       {
+		 *         "status":"ACCEPTED"|"REJECTED"|"ANALYZING",
+		 *         "url":"build.dev.cj.com/cjo-gate"
+		 *       }
+		 *  }
+		 */
+		
 		pusher.submitPush(codeLocation, credentials, new Pusher.PushListener() {
 			public void pushSucceeded() {
 				log.info("Push succeeded: " + explanation);
