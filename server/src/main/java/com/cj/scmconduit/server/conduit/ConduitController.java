@@ -26,6 +26,7 @@ import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.core.util.CommandRunnerImpl;
 import com.cj.scmconduit.server.api.ConduitType;
 import com.cj.scmconduit.server.conduit.PushSession.PushStrategy;
+import com.cj.scmconduit.server.data.Database;
 import com.cj.scmconduit.server.data.FilesOnDiskKeyValueStore;
 import com.cj.scmconduit.server.data.KeyValueStore;
 import com.cj.scmconduit.server.fs.TempDirAllocator;
@@ -47,7 +48,7 @@ public class ConduitController implements Pusher {
 	private ConduitState state = ConduitState.IDLE;
 	private String error;
 	
-	public ConduitController(String name, PrintStream out, URI publicUri, final Integer sshPort, final File pathOnDisk, TempDirAllocator temps) {
+	public ConduitController(String name, PrintStream out, URI publicUri, final Integer sshPort, final File pathOnDisk, TempDirAllocator temps, final Database database) {
 		super();
 		this.name = name;
 		this.out = out;
@@ -68,9 +69,6 @@ public class ConduitController implements Pusher {
 			throw new RuntimeException("Not sure what kind of conduit this is: " + pathOnDisk);
 		}
 		
-		KeyValueStore keysByUser = new FilesOnDiskKeyValueStore(new File("keys"));
-		KeyValueStore credentialsByUser = new FilesOnDiskKeyValueStore(new File("credentials"));
-		
 		new SshDaemon(sshPort, new SshDaemon.SessionHandler() {
             @Override
             public PushSession prepareSessionFor(P4Credentials credentials, Session session) {
@@ -83,8 +81,8 @@ public class ConduitController implements Pusher {
         }, pushStrategy, new Runnable(){
             public void run() {};
         }, 
-        keysByUser,
-        credentialsByUser);
+        database.trustedKeysByUsername(),
+        database.passwordsByUsername());
 	}
 	
 	public ConduitType type() {

@@ -1,6 +1,9 @@
 <html>
 <head>
 <script type="text/javascript" src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
+<script type="text/javascript" src="/jquery-ui/ui/jquery-ui.js"></script>
+<link rel="stylesheet" href="/jquery-ui/themes/base/jquery-ui.css"/>
+
 <style type="text/css">
 #header {
 	font-size:24pt;
@@ -35,11 +38,24 @@ div.error {
 	margin:5px;
 }
 
+button {
+	margin:5px;float:right;
+}
+
+.certificate-dialog {
+	width:500px;
+	height:500px;
+}
+.certificate-dialog textarea {
+	width:90%;
+	height:5em;
+}
+
 </style>
 </head>
 <body>
 <!-- <div style="text-align:right;">spenrose@p4cj.vclk.net [<a href="account">logout</a>]<div style="clear:both;"></div></div> -->
-<div id="header">scm-conduit-server<button style="margin:5px;float:right;clear:both;">Add</button></div>
+<div id="header">scm-conduit-server<button class="new-conduit-button">New Conduit</button><button class="add-certificate-button">Set User Certificate</button></div>
 
 <div id="whatever"></div>
 
@@ -115,8 +131,44 @@ $(function(){
 		});
 	});
 	
-	$("button").click(function(){
+	$(".new-conduit-button").click(function(){
 		document.location = "/admin";
+	});
+
+	$(".add-certificate-button").click(function(){
+		var dialog = $('<div class="certificate-dialog">' + 
+		        '<div>Username: <input class="username"></input></div>' + 
+		        '<div>Password: <input class="password" type="password"></input></div>' + 
+		        '<div>Certificate: <textarea class="certificate-text" cols="50"></textarea></div>' + 
+		        '<div><button>Submit</button>' + 
+				'</div>');
+		
+		dialog.dialog({title:"Set Certificate"});
+		
+		dialog.find("button").click(function(){
+		    function val(selector){
+		        return dialog.find(selector).val();
+		    }
+		    
+		    var username = val(".username");
+		    var data = {
+			        password : val(".password"),
+			        key : val("textarea")
+		    };
+		    
+		    $.ajax("/api/users/" + username + "/secrets", {
+				type:"PUT",
+				data:JSON.stringify(data),
+				success:function(){
+				    dialog.dialog("close");
+				},
+				error:function(){
+				    alert("there was an error!");
+				}
+			});
+		});
+		
+		
 	});
 });
 </script>

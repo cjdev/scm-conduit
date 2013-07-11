@@ -3,6 +3,7 @@ package com.cj.scmconduit.server;
 import static org.httpobjects.jackson.JacksonDSL.JacksonJson;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -24,7 +25,11 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.httpobjects.HttpObject;
+import org.httpobjects.Representation;
 import org.httpobjects.Request;
 import org.httpobjects.Response;
 import org.httpobjects.jetty.HttpObjectsJettyHandler;
@@ -52,9 +57,13 @@ import com.cj.scmconduit.core.util.CommandRunnerImpl;
 import com.cj.scmconduit.server.api.ConduitInfoDto;
 import com.cj.scmconduit.server.api.ConduitType;
 import com.cj.scmconduit.server.api.ConduitsDto;
+import com.cj.scmconduit.server.api.UserSecrets;
 import com.cj.scmconduit.server.conduit.ConduitController;
 import com.cj.scmconduit.server.conduit.ConduitState;
 import com.cj.scmconduit.server.config.Config;
+import com.cj.scmconduit.server.data.Database;
+import com.cj.scmconduit.server.data.FilesOnDiskKeyValueStore;
+import com.cj.scmconduit.server.data.KeyValueStore;
 import com.cj.scmconduit.server.fs.TempDirAllocator;
 import com.cj.scmconduit.server.fs.TempDirAllocatorImpl;
 import com.cj.scmconduit.server.jetty.ConduitHandler;
@@ -108,6 +117,7 @@ public class ConduitServerMain {
 	private final Log log;
 	private final Config config;
 	private final String publicHostname;
+	private final Database database;
 	
 	public ConduitServerMain(final Config config) throws Exception {
 		this.log = LogFactory.getLog(getClass());
@@ -115,6 +125,21 @@ public class ConduitServerMain {
 		this.path = config.path;
 		this.publicHostname = config.publicHostname;
 		this.tempDirPath = new File(this.path, "tmp");
+		
+		this.database = new Database() {
+		    KeyValueStore keysByUsername = new FilesOnDiskKeyValueStore(new File(config.path, "keys"));
+            KeyValueStore passwordsByUsername = new FilesOnDiskKeyValueStore(new File(config.path, "credentials"));
+            
+            @Override
+            public KeyValueStore trustedKeysByUsername() {
+                return keysByUsername;
+            }
+            
+            @Override
+            public KeyValueStore passwordsByUsername() {
+                return passwordsByUsername;
+            }
+        };
 		
 		mkdirs(this.tempDirPath);
 		
@@ -275,14 +300,29 @@ public class ConduitServerMain {
 			}
 		};
 		
+		
+		final HttpObject userDataApiResource = new HttpObject("/api/users/{user}/secrets"){
+		    @Override
+		    public Response put(Request req) {
+		        final String username = req.pathVars().valueFor("user");
+		        final UserSecrets secrets = readJackson(req.representation(), UserSecrets.class);
+		        
+		        database.passwordsByUsername().put(username, secrets.password);
+		        database.trustedKeysByUsername().put(username, secrets.key);
+		        
+                return CREATED(Location(""));
+		    }
+		};
+		
 		handlers.add(new HttpObjectsJettyHandler(
 							new ClasspathResourceObject("/", "index.html", getClass()), 
 							new ClasspathResourceObject("/submit.py", "submit.py", getClass()), 
-                            new ClasspathResourcesObject("/{resource}", getClass()),
+                            new ClasspathResourcesObject("/{resource*}", getClass()),
 							addConduitPage, 
 							depotHandler, 
 							conduitsApiResource,
 							conduitApiResource,
+							userDataApiResource,
 							conduitLogResource
 							));
 		
@@ -291,6 +331,16 @@ public class ConduitServerMain {
 		
 	}
 	
+	
+	private <T> T readJackson(Representation representation, Class<? extends T> clazz){
+	    try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            representation.write(bytes);
+            return new ObjectMapper().readValue(bytes.toByteArray(), clazz);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+	}
 	
 	private void mkdirs(File path){
 		if(!path.isDirectory() && !path.mkdirs()){
@@ -554,7 +604,7 @@ public class ConduitServerMain {
 	private ConduitStuff prepareConduit(final String basePublicUrl, VFSResource root, TempDirAllocator allocator, ConduitConfig conduit) {
 		final URI publicUri = URI(basePublicUrl + conduit.hostingPath);
 		final ConduitLog log = logStreamForConduit(conduit.localPath.getName());
-		ConduitController controller = new ConduitController(conduit.name, log.stream, publicUri, sshPortForConduitNamed(conduit.name), conduit.localPath, allocator);
+		ConduitController controller = new ConduitController(conduit.name, log.stream, publicUri, sshPortForConduitNamed(conduit.name), conduit.localPath, allocator, database);
 		controller.start();
 		
 		ConduitHandler handler = new ConduitHandler(conduit.hostingPath, controller);
