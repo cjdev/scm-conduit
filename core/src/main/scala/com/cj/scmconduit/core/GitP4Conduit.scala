@@ -292,7 +292,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		if(missing.isEmpty()){
 			return false;
 		}else{
-			val lines = IOUtils.readLines(new StringReader(missing)).asInstanceOf[List[String]];
+			val lines = IOUtils.readLines(new StringReader(missing));
 			
 			var lastRev = currentRev
 			lines.foreach{line=>
