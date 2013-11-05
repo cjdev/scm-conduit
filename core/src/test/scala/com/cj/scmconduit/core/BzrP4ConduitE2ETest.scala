@@ -9,10 +9,11 @@ import com.cj.scmconduit.core.bzr._
 import org.junit.Test
 import RichFile._
 import org.junit.Assert._
+import com.cj.scmconduit.core.bzr.BzrToP4Pump
 
-class BzrP4ConduitE2ETest {
+class BzrToP4PumpE2ETest {
   
-	def runE2eTest(test:(CommandRunner, ClientSpec, BzrP4Conduit)=>Unit){
+	def runE2eTest(test:(CommandRunner, ClientSpec, BzrToP4Pump)=>Unit){
 		val path = tempDir()
 		
 		val shell = new CommandRunnerImpl(System.out, System.err)
@@ -104,21 +105,21 @@ class BzrP4ConduitE2ETest {
 			
 			if(!spec.localPath.exists && !spec.localPath.mkdirs()) throw new Exception("Could not create directory: " + spec.localPath)
 	  
-			BzrP4Conduit.create(new P4DepotAddress("localhost:1666"), spec, 0, shell, new P4Credentials(spec.owner, null), System.out)
+			BzrToP4Pump.create(new P4DepotAddress("localhost:1666"), spec, 0, shell, new P4Credentials(spec.owner, null), System.out)
 			
 			var pathToDirHintFile = spec.localPath/".p4-directory" 
 			pathToDirHintFile.write("this file tells perforce that this is a directory")
 			p4(spec, shell).doCommand("add", pathToDirHintFile)
 			p4(spec, shell).doCommand("submit", "-d", "initial commit")
 			
-			val conduit = new BzrP4Conduit(spec.localPath, shell, System.out)
-			conduit.push()
+			val conduit = new BzrToP4Pump(spec.localPath, shell, System.out)
+			conduit.pullChangesFromPerforce()
 			conduit
 	}
 	
 	@Test
 	def usersCanPushToABlankDepotThroughANewConduit() {
-		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:BzrP4Conduit) =>
+		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:BzrToP4Pump) =>
 		  	
 			// GIVEN: A new conduit connected to a depot with an empty history, and a bzr branch with one change
 			val branch = tempPath()
@@ -132,7 +133,7 @@ class BzrP4ConduitE2ETest {
 			
 			// when: the change is submitted to the conduit
 			val credentials = new P4Credentials("larry", "")
-			val changesFlowed = conduit.pull(branch, credentials)
+			val changesFlowed = conduit.pushChangesToPerforce(branch, credentials)
 			conduit.commit(credentials);
 			
 			// then: 

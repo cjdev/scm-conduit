@@ -1,4 +1,4 @@
-package com.cj.scmconduit.server.conduit;
+package com.cj.scmconduit.server.ssh;
 
 import java.io.File;
 import java.io.IOException;

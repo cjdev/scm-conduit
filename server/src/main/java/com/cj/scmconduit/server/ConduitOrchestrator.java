@@ -1,4 +1,4 @@
-package com.cj.scmconduit.server.conduit;
+package com.cj.scmconduit.server;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,29 +18,34 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.sshd.common.Session;
 
-import com.cj.scmconduit.core.BzrP4Conduit;
-import com.cj.scmconduit.core.Conduit;
-import com.cj.scmconduit.core.GitP4Conduit;
+import com.cj.scmconduit.core.ScmPump;
+import com.cj.scmconduit.core.bzr.BzrToP4Pump;
+import com.cj.scmconduit.core.git.GitToP4Pump;
 import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.util.CommandRunner;
 import com.cj.scmconduit.core.util.CommandRunnerImpl;
 import com.cj.scmconduit.server.api.ConduitType;
-import com.cj.scmconduit.server.conduit.PushSession.PushStrategy;
 import com.cj.scmconduit.server.data.Database;
-import com.cj.scmconduit.server.data.FilesOnDiskKeyValueStore;
-import com.cj.scmconduit.server.data.KeyValueStore;
 import com.cj.scmconduit.server.fs.TempDirAllocator;
+import com.cj.scmconduit.server.session.BzrSessionPrepStrategy;
+import com.cj.scmconduit.server.session.CodeSubmissionSession;
+import com.cj.scmconduit.server.session.ConduitSshDaemon;
+import com.cj.scmconduit.server.session.ConduitState;
+import com.cj.scmconduit.server.session.GitSessionPrepStrategy;
+import com.cj.scmconduit.server.session.Pusher;
+import com.cj.scmconduit.server.session.SessionPrepStrategy;
+import com.cj.scmconduit.server.ssh.ShellCommand;
 
-public class ConduitController implements Pusher {
+public class ConduitOrchestrator implements Pusher {
     private final Log log = LogFactory.getLog(getClass());
 	private final PrintStream out;
 	private final URI publicUri;
 	private final File pathOnDisk;
-	private final List<PushRequest> requests = new LinkedList<PushRequest>();
-	private final Conduit conduit;
+	private final List<PushRequest> requestQueue = new LinkedList<PushRequest>();
+	private final ScmPump scmPump;
 	private final CommandRunner shell;
-	private final PushStrategy pushStrategy;
-	private final Map<Integer, PushSession> pushes = new HashMap<Integer, PushSession>();
+	private final SessionPrepStrategy prepStrategy;
+	private final Map<Integer, CodeSubmissionSession> pushes = new HashMap<Integer, CodeSubmissionSession>();
 	private final TempDirAllocator temps;
 	private final ConduitType type;
 	private final String name;
@@ -48,7 +53,7 @@ public class ConduitController implements Pusher {
 	private ConduitState state = ConduitState.IDLE;
 	private String error;
 	
-	public ConduitController(String name, PrintStream out, URI publicUri, final Integer sshPort, final File pathOnDisk, TempDirAllocator temps, final Database database) {
+	public ConduitOrchestrator(String name, PrintStream out, URI publicUri, final Integer sshPort, final File pathOnDisk, TempDirAllocator temps, final Database database) {
 		super();
 		this.name = name;
 		this.out = out;
@@ -59,30 +64,39 @@ public class ConduitController implements Pusher {
 		
 		if(new File(pathOnDisk, ".bzr").exists()){
 			type = ConduitType.BZR;
-			pushStrategy = new BzrPushStrategy();
-			conduit = new BzrP4Conduit(pathOnDisk, shell, out);
+			prepStrategy = new BzrSessionPrepStrategy();
+			scmPump = new BzrToP4Pump(pathOnDisk, shell, out);
 		}else if(new File(pathOnDisk, ".git").exists()){
 			type = ConduitType.GIT;
-			pushStrategy = new GitPushStrategy(name);
-			conduit = new GitP4Conduit(pathOnDisk, shell, out);
+			prepStrategy = new GitSessionPrepStrategy(name);
+			scmPump = new GitToP4Pump(pathOnDisk, shell, out);
 		}else{
 			throw new RuntimeException("Not sure what kind of conduit this is: " + pathOnDisk);
 		}
 		
-		new SshDaemon(sshPort, new SshDaemon.SessionHandler() {
+		final ConduitSshDaemon.SessionHandler sshSessionHandler = new ConduitSshDaemon.SessionHandler() {
             @Override
-            public PushSession prepareSessionFor(P4Credentials credentials, Session session) {
-                PushSession psession = newSession(credentials);
+            public CodeSubmissionSession prepareSessionFor(P4Credentials credentials, Session session) {
+                CodeSubmissionSession psession = newSession(credentials);
                 log.debug("THE SESSION IS: " + session.getClass().getName());
                 session.setAttribute(ShellCommand.LOCAL_PATH, psession.localPath());
                 
                 return psession;
             }
-        }, pushStrategy, new Runnable(){
+        };
+		
+        
+        final Runnable doNothing = new Runnable(){
             public void run() {};
-        }, 
-        database.trustedKeysByUsername(),
-        database.passwordsByUsername());
+        };
+        
+		new ConduitSshDaemon(
+				sshPort, 
+				sshSessionHandler, 
+				prepStrategy, 
+				doNothing, 
+		        database.trustedKeysByUsername(),
+		        database.passwordsByUsername());
 	}
 	
 	public ConduitType type() {
@@ -94,7 +108,7 @@ public class ConduitController implements Pusher {
 	}
 	
 	public void delete(){
-		conduit.delete();
+		scmPump.delete();
 	}
 	
 	public ConduitState state() {
@@ -102,26 +116,26 @@ public class ConduitController implements Pusher {
 	}
 	
 	public int queueLength(){
-		return requests.size();
+		return requestQueue.size();
 	}
 	
 	public int backlogSize(){
-		return conduit.backlogSize();
+		return scmPump.backlogSize();
 	}
 	
 	public Long currentP4Changelist(){
-		return conduit.currentP4Changelist();
+		return scmPump.currentP4Changelist();
 	}
 	
 	public String p4Path(){
-		return conduit.p4Path();
+		return scmPump.p4Path();
 	}
 	
-	public synchronized PushSession newSession(P4Credentials creds){
+	public synchronized CodeSubmissionSession newSession(P4Credentials creds){
 		final Integer id = findAvailableId();
 		out.println("id: " + id);
 		
-		PushSession session = new PushSession(name, id, publicUri, pathOnDisk, temps.newTempDir(), pushStrategy, shell, creds);
+		CodeSubmissionSession session = new CodeSubmissionSession(name, id, publicUri, pathOnDisk, temps.newTempDir(), prepStrategy, shell, creds, this);
 		pushes.put(session.id(), session);
 		return session;
 	}
@@ -134,7 +148,7 @@ public class ConduitController implements Pusher {
 		return id;
 	}
 	
-	public Map<Integer, PushSession> sessions() {
+	public Map<Integer, CodeSubmissionSession> sessions() {
         return Collections.unmodifiableMap(pushes);
     }
 	
@@ -153,17 +167,17 @@ public class ConduitController implements Pusher {
 	}
 
 	public void submitPush(File location, final P4Credentials credentials, PushListener listener){
-		synchronized(requests){
-			requests.add(new PushRequest(location, listener, credentials));
-			requests.notifyAll();
+		synchronized(requestQueue){
+			requestQueue.add(new PushRequest(location, listener, credentials));
+			requestQueue.notifyAll();
 		}
 	}
 
 	private PushRequest popNextRequest(){
-		synchronized(requests){
-			if(requests.size()>0){
-				PushRequest r = requests.get(0);
-				requests.remove(0);
+		synchronized(requestQueue){
+			if(requestQueue.size()>0){
+				PushRequest r = requestQueue.get(0);
+				requestQueue.remove(0);
 				return r;
 			}else{
 				return null;
@@ -180,7 +194,7 @@ public class ConduitController implements Pusher {
 				while(keepRunning){
 					try {
 						state = ConduitState.POLLING;
-						pumpIn();
+						readFromPerforce();
 						PushRequest request = popNextRequest();
 						if(request!=null){
 							state = ConduitState.SENDING;
@@ -189,8 +203,8 @@ public class ConduitController implements Pusher {
 						}else{
 							out.println("Sleeping");
 							state = ConduitState.IDLE;
-							synchronized(requests){
-							    requests.wait(5000);
+							synchronized(requestQueue){
+							    requestQueue.wait(5000);
 							}
 							out.println("Waking-up");
 						}
@@ -222,10 +236,10 @@ public class ConduitController implements Pusher {
 			String source = request.location.getAbsolutePath();
 			out.println("Pulling from " + source);
 			
-			boolean changesWerePulled = conduit.pull(source, credentials);
+			boolean changesWerePulled = scmPump.pushChangesToPerforce(source, credentials);
 			if(changesWerePulled){
 				out.println("Committing");
-				conduit.commit(credentials);
+				scmPump.commit(credentials);
 				request.listener.pushSucceeded();
 			}else{
 				request.listener.nothingToPush();
@@ -238,7 +252,7 @@ public class ConduitController implements Pusher {
 			errors.add(e);
 			
 			try{
-				conduit.rollback(credentials);
+				scmPump.rollback(credentials);
 			}catch(Throwable e2){
 				e2.printStackTrace();
 				errors.add(e2);
@@ -267,9 +281,9 @@ public class ConduitController implements Pusher {
 		}
 	}
 	
-	private void pumpIn() throws Exception{
+	private void readFromPerforce() throws Exception{
 		out.println("Pumping conduit " + pathOnDisk.getAbsolutePath());
-		conduit.push();
+		scmPump.pullChangesFromPerforce();
 	}
 
 	public void stop() {

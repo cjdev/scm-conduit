@@ -1,4 +1,4 @@
-package com.cj.scmconduit.server.conduit;
+package com.cj.scmconduit.server.session;
 
 import java.io.File;
 

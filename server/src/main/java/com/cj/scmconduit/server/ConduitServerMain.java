@@ -25,8 +25,6 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.log4j.BasicConfigurator;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.httpobjects.HttpObject;
 import org.httpobjects.Representation;
@@ -46,9 +44,9 @@ import scala.Tuple2;
 import scala.runtime.AbstractFunction1;
 import scala.runtime.BoxedUnit;
 
-import com.cj.scmconduit.core.BzrP4Conduit;
-import com.cj.scmconduit.core.Conduit;
-import com.cj.scmconduit.core.GitP4Conduit;
+import com.cj.scmconduit.core.ScmPump;
+import com.cj.scmconduit.core.bzr.BzrToP4Pump;
+import com.cj.scmconduit.core.git.GitToP4Pump;
 import com.cj.scmconduit.core.p4.ClientSpec;
 import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.p4.P4DepotAddress;
@@ -58,16 +56,14 @@ import com.cj.scmconduit.server.api.ConduitInfoDto;
 import com.cj.scmconduit.server.api.ConduitType;
 import com.cj.scmconduit.server.api.ConduitsDto;
 import com.cj.scmconduit.server.api.UserSecrets;
-import com.cj.scmconduit.server.conduit.ConduitController;
-import com.cj.scmconduit.server.conduit.ConduitState;
-import com.cj.scmconduit.server.config.Config;
 import com.cj.scmconduit.server.data.Database;
 import com.cj.scmconduit.server.data.FilesOnDiskKeyValueStore;
 import com.cj.scmconduit.server.data.KeyValueStore;
 import com.cj.scmconduit.server.fs.TempDirAllocator;
 import com.cj.scmconduit.server.fs.TempDirAllocatorImpl;
-import com.cj.scmconduit.server.jetty.ConduitHandler;
 import com.cj.scmconduit.server.jetty.VFSResource;
+import com.cj.scmconduit.server.session.ConduitState;
+import com.cj.scmconduit.server.ui.AddConduitResource;
 import com.cj.scmconduit.server.util.SelfResettingFileOutputStream;
 
 public class ConduitServerMain {
@@ -112,7 +108,7 @@ public class ConduitServerMain {
 	private final String basePublicUrl;
 	private final P4DepotAddress p4Address;
 	private final TempDirAllocator allocator;
-	private final List<ConduitStuff> conduits = new ArrayList<ConduitServerMain.ConduitStuff>();
+	private final List<HostableConduit> conduits = new ArrayList<ConduitServerMain.HostableConduit>();
 	private final List<ConduitCreationThread> creationThreads = new ArrayList<ConduitServerMain.ConduitCreationThread>();
 	private final Log log;
 	private final Config config;
@@ -158,12 +154,11 @@ public class ConduitServerMain {
 		
 		allocator = new TempDirAllocatorImpl(tempDirPath);
 		
-		for(ConduitConfig conduit: findConduits()){
+		for(ConduitDiscoveryResult conduit: findConduits()){
 			if(conduit.localPath.listFiles().length==0){
 				FileUtils.deleteDirectory(conduit.localPath);
 			}else{
-				ConduitStuff stuff = prepareConduit(basePublicUrl, root, allocator, conduit);
-				conduits.add(stuff);
+				conduits.add(startConduit(basePublicUrl, root, allocator, conduit));
 			}
 		}
 		
@@ -182,10 +177,10 @@ public class ConduitServerMain {
 		
 		HttpObject depotHandler = new HttpObject("/{conduitName}/{remainder*}", null) {
 			
-			public ConduitStuff findConduitForPath(String conduitName) {
-				ConduitStuff foundConduit = null;
-				for (ConduitStuff conduit : conduits) {
-					final String next = conduit.handler.name;
+			public HostableConduit findConduitForPath(String conduitName) {
+				HostableConduit foundConduit = null;
+				for (HostableConduit conduit : conduits) {
+					final String next = conduit.httpResource.name;
 					log.debug("name: " + next);
 					if (conduitName.equals(next)) {
 						foundConduit = conduit;
@@ -197,8 +192,8 @@ public class ConduitServerMain {
 			public Response relay(Request req, final Method m) {
 				String conduitName = "/" + req.pathVars().valueFor("conduitName");
 				
-				ConduitStuff match = findConduitForPath(conduitName);
-				if(match!=null) return HttpObjectUtil.invokeMethod(match.handler, m, req);
+				HostableConduit match = findConduitForPath(conduitName);
+				if(match!=null) return HttpObjectUtil.invokeMethod(match.httpResource, m, req);
 				else {
 					log.debug("There is no conduit at " + conduitName);
 					return null;
@@ -221,7 +216,7 @@ public class ConduitServerMain {
 			@Override
 			public Response get(Request req) {
 				final String conduitName = req.pathVars().valueFor("conduitName");
-				final ConduitStuff conduit = conduitNamed(conduitName);
+				final HostableConduit conduit = conduitNamed(conduitName);
 				if(conduit==null){
 					return NOT_FOUND();
 				}else{
@@ -243,7 +238,7 @@ public class ConduitServerMain {
 			@Override
 			public Response get(Request req) {
 				final String conduitName = req.pathVars().valueFor("conduitName");
-				final ConduitStuff conduit = conduitNamed(conduitName);
+				final HostableConduit conduit = conduitNamed(conduitName);
 				if(conduit==null){
 					return NOT_FOUND();
 				}else{
@@ -254,15 +249,15 @@ public class ConduitServerMain {
 			@Override
 			public Response delete(Request req) {
 				final String conduitName = req.pathVars().valueFor("conduitName");
-				final ConduitStuff conduit = conduitNamed(conduitName);
+				final HostableConduit conduit = conduitNamed(conduitName);
 				if(conduit==null){
 					return NOT_FOUND();
 				}else{
 					try {
 						log.info("Deleting " + conduitName);
 						conduits.remove(conduit);
-						conduit.controller.stop();
-						conduit.controller.delete();
+						conduit.orchestrator.stop();
+						conduit.orchestrator.delete();
 						return OK(Text("deleted"));
 					} catch (Exception e) {
 						return INTERNAL_SERVER_ERROR(e);
@@ -278,19 +273,19 @@ public class ConduitServerMain {
 			public Response get(Request req) {
 				ConduitsDto conduitsDto = new ConduitsDto();
 				
-				for(ConduitStuff conduit : conduits){
+				for(HostableConduit conduit : conduits){
 					conduitsDto.conduits.add(conduit.toDto());
 				}
 				
 				for(ConduitCreationThread next : creationThreads){
 					ConduitInfoDto dto = new ConduitInfoDto();
 					dto.name = next.name;
-					if(next.theConduit==null){
+					if(next.pump==null){
 						dto.status = ConduitState.STARTING;
 					}else{
 						dto.status = ConduitState.BUILDING;
-						dto.backlogSize = next.theConduit.backlogSize();
-						dto.currentP4Changelist = next.theConduit.currentP4Changelist();
+						dto.backlogSize = next.pump.backlogSize();
+						dto.currentP4Changelist = next.pump.currentP4Changelist();
 					}
 					
 					conduitsDto.conduits.add(dto);
@@ -348,8 +343,8 @@ public class ConduitServerMain {
 		}
 	}
 	
-	private ConduitStuff conduitNamed(String name){
-		for(ConduitStuff next : conduits){
+	private HostableConduit conduitNamed(String name){
+		for(HostableConduit next : conduits){
 			if(next.isNamed(name)){
 				return next;
 			}
@@ -395,7 +390,7 @@ public class ConduitServerMain {
 		final String p4Path;
 		final Integer p4FirstCL;
 		final VFSResource root;
-		Conduit theConduit;
+		ScmPump pump;
 		
 		private ConduitCreationThread(Config config, ConduitType type,
 				String name, String p4Path, Integer p4FirstCL, VFSResource root) {
@@ -421,7 +416,6 @@ public class ConduitServerMain {
 				
 				String clientId = config.clientIdPrefix + name;
 				
-				@SuppressWarnings("deprecation")
 				scala.collection.immutable.List<Tuple2<String, String>> view = scala.collection.immutable.List.fromArray(new Tuple2[]{
 						new Tuple2<String, String>(p4Path + "/...", "/...")
 				});
@@ -435,30 +429,30 @@ public class ConduitServerMain {
 				
 				P4Credentials credentials = new P4Credentials(config.p4User, "");
 				
-				Function1<Conduit, BoxedUnit> observerFunction = new AbstractFunction1<Conduit, BoxedUnit>(){
+				Function1<ScmPump, BoxedUnit> observerFunction = new AbstractFunction1<ScmPump, BoxedUnit>(){
 					@Override
-					public BoxedUnit apply(Conduit arg0) {
-						theConduit = arg0;
+					public BoxedUnit apply(ScmPump arg0) {
+						pump = arg0;
 						return BoxedUnit.UNIT;
 					}
 				};
 				
 				if(type == ConduitType.GIT){
-					GitP4Conduit.create(p4Address, spec, p4FirstCL, shell, credentials, logStream, observerFunction);
+					GitToP4Pump.create(p4Address, spec, p4FirstCL, shell, credentials, logStream, observerFunction);
 				}else if(type == ConduitType.BZR){
-					BzrP4Conduit.create(p4Address, spec, p4FirstCL, shell, credentials, logStream, observerFunction);
+					BzrToP4Pump.create(p4Address, spec, p4FirstCL, shell, credentials, logStream, observerFunction);
 				}else{
 					throw new RuntimeException("not sure how to create a \"" + type + "\" conduit");
 				}
 				
-				ConduitConfig conduit = new ConduitConfig("/" + name, localPath);
-				ConduitStuff stuff = prepareConduit(basePublicUrl, root, allocator, conduit);
+				ConduitDiscoveryResult conduit = new ConduitDiscoveryResult("/" + name, localPath);
+				HostableConduit stuff = startConduit(basePublicUrl, root, allocator, conduit);
 				conduits.add(stuff);
 			} catch (Exception e){
 				e.printStackTrace(logStream==null?System.out:logStream);
 				log.error(e);
-				if(theConduit!=null){
-					theConduit.delete();
+				if(pump!=null){
+					pump.delete();
 				}
 			} finally{
 				creationThreads.remove(this);
@@ -470,12 +464,12 @@ public class ConduitServerMain {
 		Response invoke(Request req, HttpObject o);
 	}
 	
-	class ConduitConfig {
+	class ConduitDiscoveryResult {
 	    public final String name;
 		public final String hostingPath;
 		public final File localPath;
 		
-		private ConduitConfig(String hostingPath, File localPath) {
+		private ConduitDiscoveryResult(String hostingPath, File localPath) {
 			super();
 			this.hostingPath = hostingPath;
 			this.localPath = localPath;
@@ -484,8 +478,8 @@ public class ConduitServerMain {
 		
 	}
 
-	private List<ConduitConfig> findConduits(){
-		List<ConduitConfig> conduits = new ArrayList<ConduitConfig>();
+	private List<ConduitDiscoveryResult> findConduits(){
+		List<ConduitDiscoveryResult> conduits = new ArrayList<ConduitDiscoveryResult>();
 		
 		File conduitsDir = new File(path, "conduits");
 		
@@ -495,50 +489,54 @@ public class ConduitServerMain {
 			if(localPath.isDirectory() && !localPath.getName().toLowerCase().endsWith(".bak")){
 				String httpPath = "/" + localPath.getName();//.replaceAll(Pattern.quote("-"), "/");
 				
-				conduits.add(new ConduitConfig(httpPath, localPath));
+				conduits.add(new ConduitDiscoveryResult(httpPath, localPath));
 			}
 		}
 		
 		return conduits;
 	}
 	
-	class ConduitStuff {
+	class HostableConduit {
 		final String p4path;
-		final ConduitConfig config;
-		final ConduitHandler handler;
-		final ConduitController controller;
+	    final String name;
+		final String hostingPath;
+		final File localPath;
+		final ConduitHttpResource httpResource;
+		final ConduitOrchestrator orchestrator;
 		final ConduitLog log;
 		
-		private ConduitStuff(ConduitConfig config, ConduitHandler handler,
-				ConduitController controller, ConduitLog log) {
+		private HostableConduit(ConduitDiscoveryResult config, ConduitHttpResource handler,
+				ConduitOrchestrator controller, ConduitLog log) {
 			super();
-			this.config = config;
-			this.handler = handler;
-			this.controller = controller;
+			this.name = config.name;
+			this.hostingPath = config.hostingPath;
+			this.localPath = config.localPath;
+			this.httpResource = handler;
+			this.orchestrator = controller;
 			this.p4path = controller.p4Path();
 			this.log = log;
 		}
 		
 
 		public boolean isNamed(String name) {
-			return handler.name.replaceAll(Pattern.quote("/"), "").equals(name);
+			return httpResource.name.replaceAll(Pattern.quote("/"), "").equals(name);
 		}
 
 		ConduitInfoDto toDto(){
-			final ConduitStuff conduit = this;
+			final HostableConduit conduit = this;
 			final ConduitInfoDto dto = new ConduitInfoDto();
-			dto.readOnlyUrl = basePublicUrl + conduit.config.hostingPath + (new File(conduit.config.localPath, ".git").exists()?"/.git":"");
-			dto.apiUrl = basePublicUrl + "/api/conduits" + conduit.config.hostingPath ;
+			dto.readOnlyUrl = basePublicUrl + conduit.hostingPath + (new File(conduit.localPath, ".git").exists()?"/.git":"");
+			dto.apiUrl = basePublicUrl + "/api/conduits" + conduit.hostingPath ;
 			dto.p4path = conduit.p4path;
-			dto.name = conduit.config.localPath.getName();
-			dto.queueLength = conduit.controller.queueLength();
-			dto.status = conduit.controller.state();
-			dto.backlogSize = conduit.controller.backlogSize();
-			dto.currentP4Changelist = conduit.controller.currentP4Changelist();
-			dto.error = conduit.controller.error();
-			dto.type = conduit.controller.type();
-			dto.logUrl = basePublicUrl + "/api/conduits" + conduit.config.hostingPath + "/log";
-			dto.sshUrl = "ssh://" + publicHostname + ":" + sshPortForConduitNamed(conduit.config.name) + "/" + conduit.config.name;
+			dto.name = conduit.localPath.getName();
+			dto.queueLength = conduit.orchestrator.queueLength();
+			dto.status = conduit.orchestrator.state();
+			dto.backlogSize = conduit.orchestrator.backlogSize();
+			dto.currentP4Changelist = conduit.orchestrator.currentP4Changelist();
+			dto.error = conduit.orchestrator.error();
+			dto.type = conduit.orchestrator.type();
+			dto.logUrl = basePublicUrl + "/api/conduits" + conduit.hostingPath + "/log";
+			dto.sshUrl = "ssh://" + publicHostname + ":" + sshPortForConduitNamed(conduit.name) + "/" + conduit.name;
 			return dto;
 		}
 	}
@@ -601,18 +599,18 @@ public class ConduitServerMain {
 	    return port;
 	}
 	
-	private ConduitStuff prepareConduit(final String basePublicUrl, VFSResource root, TempDirAllocator allocator, ConduitConfig conduit) {
+	private HostableConduit startConduit(final String basePublicUrl, VFSResource root, TempDirAllocator allocator, ConduitDiscoveryResult conduit) {
 		final URI publicUri = URI(basePublicUrl + conduit.hostingPath);
 		final ConduitLog log = logStreamForConduit(conduit.localPath.getName());
-		ConduitController controller = new ConduitController(conduit.name, log.stream, publicUri, sshPortForConduitNamed(conduit.name), conduit.localPath, allocator, database);
-		controller.start();
+		ConduitOrchestrator orchestrator = new ConduitOrchestrator(conduit.name, log.stream, publicUri, sshPortForConduitNamed(conduit.name), conduit.localPath, allocator, database);
+		orchestrator.start();
 		
-		ConduitHandler handler = new ConduitHandler(conduit.hostingPath, controller);
+		ConduitHttpResource httpResource = new ConduitHttpResource(conduit.hostingPath, orchestrator);
 		
 		// For basic read-only "GET" access
 		this.log.info("Serving " + conduit.localPath + " at " + conduit.hostingPath);
 		root.addVResource(conduit.hostingPath, conduit.localPath);
-		return new ConduitStuff(conduit, handler, controller, log);
+		return new HostableConduit(conduit, httpResource, orchestrator, log);
 	}
 	
 	URI URI(String uri){

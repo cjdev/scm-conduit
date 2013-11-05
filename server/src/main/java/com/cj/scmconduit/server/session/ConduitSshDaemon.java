@@ -1,7 +1,6 @@
-package com.cj.scmconduit.server.conduit;
+package com.cj.scmconduit.server.session;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigInteger;
@@ -9,7 +8,6 @@ import java.security.PublicKey;
 import java.security.interfaces.RSAPublicKey;
 
 import org.apache.commons.codec.binary.Base64;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.mina.core.session.IoSession;
@@ -25,20 +23,19 @@ import org.apache.sshd.server.session.ServerSession;
 import org.apache.sshd.server.session.SessionFactory;
 
 import com.cj.scmconduit.core.p4.P4Credentials;
-import com.cj.scmconduit.server.conduit.PushSession.PushStrategy;
 import com.cj.scmconduit.server.data.KeyValueStore;
 import com.cj.scmconduit.server.ssh.SshFsView;
 
-public class SshDaemon {
+public class ConduitSshDaemon {
     public interface SessionHandler{
-        PushSession prepareSessionFor(P4Credentials credentials, Session session);
+        CodeSubmissionSession prepareSessionFor(P4Credentials credentials, Session session);
     }
     private final SshServer sshd;
     private final Log log = LogFactory.getLog(getClass());
     private final AttributeKey<P4Credentials> CREDENTIALS_KEY = new AttributeKey<P4Credentials>();
-    public final AttributeKey<PushSession> PUSH_SESSION_KEY = new AttributeKey<PushSession>();
+    public final AttributeKey<CodeSubmissionSession> PUSH_SESSION_KEY = new AttributeKey<CodeSubmissionSession>();
     
-    public SshDaemon(int port, final SessionHandler handler, final PushStrategy strategy, final Runnable onPushComplete, final KeyValueStore sshKeys, final KeyValueStore perforcePasswords) { 
+    public ConduitSshDaemon(int port, final SessionHandler handler, final SessionPrepStrategy strategy, final Runnable onPushComplete, final KeyValueStore sshKeys, final KeyValueStore perforcePasswords) { 
 
         log.info("Serving at port " + port);
         try {
@@ -48,7 +45,7 @@ public class SshDaemon {
                 @Override
                 public FileSystemView createFileSystemView(Session session)
                         throws IOException {
-                    PushSession push = session.getAttribute(PUSH_SESSION_KEY);
+                    CodeSubmissionSession push = session.getAttribute(PUSH_SESSION_KEY);
                     return new SshFsView(
                                     session.getUsername(), 
                                     false, 
@@ -59,17 +56,13 @@ public class SshDaemon {
             sshd.setPort(port);
             sshd.setKeyPairProvider(new SimpleGeneratorHostKeyProvider("hostkey.ser"));
             sshd.setPasswordAuthenticator(new PasswordAuthenticator() {
-
                 public boolean authenticate(String username, String password, ServerSession session) {
                     setCredentials(handler, session, new P4Credentials(username, password));
                     return true;
                 }
-
-                
             });
             
             sshd.setPublickeyAuthenticator(new PublickeyAuthenticator() {
-                
                 @Override
                 public boolean authenticate(String username, PublicKey key, ServerSession session) {
                     try {
@@ -114,9 +107,6 @@ public class SshDaemon {
                         return result;
                     }
                 }
-                
-                
-                
             });
             
             strategy.configureSshDaemon(sshd, null, port);
@@ -149,9 +139,8 @@ public class SshDaemon {
     }
     
     private void setCredentials(final SessionHandler handler, ServerSession session, P4Credentials credentials) {
-//        log.debug("password for " + credentials.user + " is '" + credentials.password + "'");
         session.setAttribute(CREDENTIALS_KEY, credentials);
-        PushSession push = handler.prepareSessionFor(credentials, session);
+        CodeSubmissionSession push = handler.prepareSessionFor(credentials, session);
         session.setAttribute(PUSH_SESSION_KEY, push);
     }
     

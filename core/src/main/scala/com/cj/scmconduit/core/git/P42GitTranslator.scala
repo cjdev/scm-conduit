@@ -1,19 +1,14 @@
-package com.cj.scmconduit.core;
+package com.cj.scmconduit.core.git
 
-import java.util.Arrays.asList;
-
-import java.io.File;
-import java.util.Arrays;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-
-import com.cj.scmconduit.core.p4.P4Changelist;
-import com.cj.scmconduit.core.p4.P4SyncOutputParser;
-import com.cj.scmconduit.core.p4.P4Time;
-import com.cj.scmconduit.core.p4.P4SyncOutputParser.Change;
-import com.cj.scmconduit.core.p4.P4SyncOutputParser.ChangeType;
-
+import java.util.Arrays.asList
+import java.io.File
+import java.util.ArrayList
+import java.util.LinkedList
+import java.util.List
+import com.cj.scmconduit.core.p4.P4Changelist
+import com.cj.scmconduit.core.p4.P4Time
+import com.cj.scmconduit.core.p4.P4SyncOutputParser.Change
+import com.cj.scmconduit.core.p4.P4SyncOutputParser.ChangeType
 import scala.collection.JavaConversions._
 
 class P42GitTranslator (private val conduitPath:File) {

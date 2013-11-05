@@ -10,6 +10,7 @@ import com.cj.scmconduit.core.git.GitRevisionInfo.{
   Change, ChangeType
 }
 import org.apache.commons.io.IOUtils
+import com.cj.scmconduit.core.git.Git2P4Translator
 
 class TranslatorTest {
 
@@ -28,7 +29,7 @@ class TranslatorTest {
 	    case _ => commandsIssued.+=(parts.toList);"<enter description here>"
 	  }
 	}
-    val t = new Translator(p4) 
+    val t = new Git2P4Translator(p4) 
     
     val changes = new GitRevisionInfo(
 			"jerry lee lewis",
@@ -62,7 +63,7 @@ class TranslatorTest {
 	    case _ => commandsIssued.+=(parts.toList);"<enter description here>"
 	  }
 	}
-    val t = new Translator(p4) 
+    val t = new Git2P4Translator(p4) 
     
     val changes = new GitRevisionInfo(
 			"jerry lee lewis",
@@ -97,7 +98,7 @@ class TranslatorTest {
 	    case _ => commandsIssued.+=(parts.toList);"<enter description here>"
 	  }
 	}
-    val t = new Translator(p4) 
+    val t = new Git2P4Translator(p4) 
     
     val changes = new GitRevisionInfo(
 			"jerry lee lewis",
@@ -131,7 +132,7 @@ class TranslatorTest {
 	    case _ => commandsIssued.+=(parts.toList);"<enter description here>"
 	  }
 	}
-    val t = new Translator(p4) 
+    val t = new Git2P4Translator(p4) 
     
     val change = new Change(ChangeType.R, "test.txt", "file.txt")
     
@@ -171,7 +172,7 @@ class TranslatorTest {
 	    case _ => ""
 	  }
 	}
-    val t = new Translator(p4)
+    val t = new Git2P4Translator(p4)
     
     val changes = new GitRevisionInfo(
 			"jerry lee lewis",

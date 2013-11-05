@@ -1,13 +1,9 @@
-package com.cj.scmconduit.server.config;
+package com.cj.scmconduit.server;
 
 import java.io.File;
 import java.net.InetAddress;
 
-import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
-
-import com.cj.scmconduit.server.jaxb.FileXmlAdapter;
 
 @XmlRootElement
 public class Config {
@@ -24,30 +20,14 @@ public class Config {
 			throw new RuntimeException("Error parsing arguments", e);
 		}
 	}
-	@XmlJavaTypeAdapter(FileXmlAdapter.class)
-	public File path;
+	public final File path;
+	public final String publicHostname;
+	public final String clientIdPrefix;
+	public final String p4Address;
+	public final String p4User;
+	public final File basePathForNewConduits;
+	public final Integer port;
 	
-	@XmlElement(name="publish-host")
-	public String publicHostname;
-	
-	@XmlElement(name="client-id-prefix")
-	public String clientIdPrefix;
-
-	@XmlElement(name="perforce-server-location")
-	public String p4Address;
-
-	@XmlElement(name="owner-for-new-conduits")
-	public String p4User;
-
-	@XmlJavaTypeAdapter(FileXmlAdapter.class)
-	@XmlElement(name="path-for-new-conduits")
-	public File basePathForNewConduits;
-	
-	public Integer port;
-	
-	public Config() {
-	}
-
 	public Config(Integer port, String publicHostname, File localPath, String p4Address, String p4User) {
 		super();
 		this.port = port;

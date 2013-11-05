@@ -1,8 +1,6 @@
-package com.cj.scmconduit.core;
+package com.cj.scmconduit.core.git
 
 import java.io.{File, StringReader, PrintStream}
-import java.util.ArrayList
-import java.util.Arrays
 import java.util.List
 import java.util.regex.Pattern
 import org.apache.commons.io.{IOUtils, FileUtils}
@@ -17,19 +15,18 @@ import com.cj.scmconduit.core.p4.P4
 import com.cj.scmconduit.core.p4.ClientSpec
 import com.cj.scmconduit.core.p4.P4RevRangeSpec
 import com.cj.scmconduit.core.p4.P4RevSpec
-import com.cj.scmconduit.core.p4.P4SyncOutputParser.Change
 import com.cj.scmconduit.core.p4.createDummyInitialP4Commit
 import com.cj.scmconduit.core.util.CommandRunner
 import scala.collection.JavaConversions._
 import java.io.ByteArrayInputStream
-import RichFile._
-import com.cj.scmconduit.core.git.Git
-import java.io.BufferedReader
-import java.io.FileReader
+import com.cj.scmconduit.core.RichFile._
+import com.cj.scmconduit.core.PumpState
+import com.cj.scmconduit.core.ScmPump
+import javax.xml.bind.annotation.XmlRootElement
 
-object GitP4Conduit {
+object GitToP4Pump {
   
-	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials, out:PrintStream, observer:(Conduit)=>Unit = {c=>}) {
+	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials, out:PrintStream, observer:(ScmPump)=>Unit = {c=>}) {
 		    spec.localPath.mkdirs()
 		    
 			val p4:P4 = new P4Impl(
@@ -59,7 +56,7 @@ object GitP4Conduit {
 				</scm-conduit-state>
 			    )
 			    
-			val conduit = new GitP4Conduit(spec.localPath, shell, out)
+			val conduit = new GitToP4Pump(spec.localPath, shell, out)
 			observer(conduit);
 			createDummyInitialP4Commit(spec.localPath, p4, conduit)
 			    
@@ -67,7 +64,7 @@ object GitP4Conduit {
 	
 }
 
-class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner, private val out:PrintStream) extends Conduit {
+class GitToP4Pump(private val conduitPath:File, private val shell:CommandRunner, private val out:PrintStream) extends ScmPump {
 //	private static final String TEMP_FILE_NAME=".scm-conduit-temp";
 	private val META_FILE_NAME=".scm-conduit";
 
@@ -90,7 +87,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
         p4.doCommand("revert", "//...");
         
         val changes = pendingChangesForThisP4Workspace()
-        
+
         val lines = changes.split(Pattern.quote("\n"));
         
         lines.foreach{line=>
@@ -115,11 +112,11 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		try{
 			FileUtils.deleteDirectory(conduitPath);
 		}catch{
-		  case _ => shell.run("rm", "-rf", conduitPath.getAbsolutePath())
+		  case _:Throwable => shell.run("rm", "-rf", conduitPath.getAbsolutePath())
 		}
 	}
 	
-	override def push() {
+	override def pullChangesFromPerforce() {
         assertNoPendingChangelists();
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
 		
@@ -218,12 +215,12 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		path
 	}
 	
-	private def state():ConduitState = {
-		return ConduitState.read(new File(conduitPath, META_FILE_NAME));
+	private def state():PumpState = {
+		return PumpState.read(new File(conduitPath, META_FILE_NAME));
 	}
 
-	private def writeState(state:ConduitState){
-		ConduitState.write(state, new File(conduitPath, META_FILE_NAME));
+	private def writeState(state:PumpState){
+		PumpState.write(state, new File(conduitPath, META_FILE_NAME));
 	}
 
 	private def findLastSyncRevision():Long =  {
@@ -267,7 +264,8 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	    }
 	}
 	
-	override def pull(source:String, using:P4Credentials):Boolean = {
+	
+	override def pushChangesToPerforce(source:String, using:P4Credentials):Boolean = {
 	  
 	    assertNoPendingChangelists();
 	  
@@ -276,23 +274,25 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		try{
 			git.run("remote", "rm", "temp");
 		}catch{
-		  case _=>// nothing to do
+		  case _:Throwable=>// nothing to do
 		}
 		deleteBranchIfExists(incomingBranchName)
 		  
 		val currentRev = git.run("log", "-1", "--format=%H").trim();
 		git.run("remote", "add", "temp", source);
 		git.run("fetch", "temp");
+		
 		git.run("branch", incomingBranchName, "temp/master");
 		git.run("checkout", incomingBranchName);
-		val missing = git.run("cherry", "master");
+		val incomingRevisions = git.run("cherry", "master");
 		git.run("checkout", "master");
         git.run("branch", "-d", incomingBranchName);
-		out.println("Missing is " + missing);
-		if(missing.isEmpty()){
+        
+		out.println("Missing is " + incomingRevisions);
+		if(incomingRevisions.isEmpty()){
 			return false;
 		}else{
-			val lines = IOUtils.readLines(new StringReader(missing));
+			val lines = IOUtils.readLines(new StringReader(incomingRevisions));
 			
 			var lastRev = currentRev
 			lines.foreach{line=>
@@ -306,7 +306,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 				val myp4 = p4ForUser(using)
 				
 				try {
-					val changeListNum = new Translator(myp4).translate(changes); 
+					val changeListNum = new Git2P4Translator(myp4).translate(changes); 
 					myp4.doCommand("submit", "-c", changeListNum.toString());		
 					git.run("tag", "cl" + changeListNum.toString())
 				}catch{
@@ -316,7 +316,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 				  }
 				}
 				lastRev = rev
-				push()
+				pullChangesFromPerforce()
 			}
 			
 			git.run("update-server-info")
@@ -340,7 +340,7 @@ class GitP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 	  try{
             git.run("branch", "-D", p4LatestBranchName);
         }catch{
-          case _=>// nothing to do
+          case _:Throwable=>// nothing to do
         }
 	}
 

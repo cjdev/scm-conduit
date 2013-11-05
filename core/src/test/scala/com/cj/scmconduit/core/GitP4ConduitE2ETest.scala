@@ -20,8 +20,9 @@ import java.io.OutputStream
 import java.io.PrintStream
 import java.util.regex.Pattern
 import java.io.InputStream
+import com.cj.scmconduit.core.git.GitToP4Pump
 
-class GitP4ConduitE2ETest {
+class GitToP4PumpE2ETest {
   
   @Before
   def safetyCheck(){
@@ -37,7 +38,7 @@ class GitP4ConduitE2ETest {
  
   @Test
   def gracefullyHandlesRacesWithOtherPerforceUsers(){
-    runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+    runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
         // GIVEN:
       
         {// An existing file in perforce
@@ -52,7 +53,7 @@ class GitP4ConduitE2ETest {
             
             p4(iSpec, shell).doCommand("edit", readmeDotMd.getAbsolutePath())
             p4(iSpec, shell).doCommand("submit", "-d", "Initial submit")
-            conduit.push()
+            conduit.pullChangesFromPerforce()
         }
           
         {// A perforce user's submission
@@ -79,11 +80,11 @@ class GitP4ConduitE2ETest {
             runGit(shell, pathToFredsClone, "add", "--all")
             runGit(shell, pathToFredsClone, "commit", "-m", "Fleshed-out the REAME.md a little")
             
-            conduit.pull(pathToFredsClone, new P4Credentials("larry", ""))
+            conduit.pushChangesToPerforce(pathToFredsClone, new P4Credentials("larry", ""))
         }
         
         // WHEN:
-        conduit.push()
+        conduit.pullChangesFromPerforce()
         
         // THEN:
           
@@ -101,7 +102,7 @@ class GitP4ConduitE2ETest {
   
     @Test
     def accomodatesPerforceChangelistsThatConsistsExcluseivelyOfFilesThatHaveNotChanged() {
-        runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+        runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
             
             // GIVEN: A new conduit connected to a depot with an empty history, and a git branch with one change
             {// An existing file in perforce
@@ -116,7 +117,7 @@ class GitP4ConduitE2ETest {
                 
                 p4(iSpec, shell).doCommand("edit", readmeDotMd.getAbsolutePath())
                 p4(iSpec, shell).doCommand("submit", "-d", "Initial submit")
-                conduit.push()
+                conduit.pullChangesFromPerforce()
             }
               
             
@@ -129,13 +130,13 @@ class GitP4ConduitE2ETest {
                 
                 p4(sallysSpec, shell).doCommand("edit", readmeDotMd.getAbsolutePath())
                 p4(sallysSpec, shell).doCommand("submit", "-d", "Looks like I changed this but I actually did nothing!")
-                conduit.push()
+                conduit.pullChangesFromPerforce()
             }
             
             
             // WHEN:
             val maybeErr = try{
-                    conduit.push()
+                    conduit.pullChangesFromPerforce()
                     None
                 }catch {case t:Throwable=>Some(t)}
             
@@ -146,7 +147,7 @@ class GitP4ConduitE2ETest {
   
 	@Test
 	def returnsFalseWhenThereIsNothingToPush() {
-		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
 		  	
 			// GIVEN: A new conduit connected to a depot with an empty history, and a git branch with one change
 			val branch = tempPath("myclone")
@@ -155,7 +156,7 @@ class GitP4ConduitE2ETest {
 			val haveBefore = p4(spec, shell).doCommand("have")
 			
 			// when: the change is submitted to the conduit
-			val changesFlowed = conduit.pull(branch, new P4Credentials("larry", ""))
+			val changesFlowed = conduit.pushChangesToPerforce(branch, new P4Credentials("larry", ""))
 			
 			// then: 
 			assertTrue("Nothing should have been pushed", !changesFlowed)
@@ -180,7 +181,7 @@ class GitP4ConduitE2ETest {
 		val baos = new ByteArrayOutputStream()
 		val cmdRunner = new CommandRunnerImpl(new PrintStream(baos), new PrintStream(baos))
 		
-  		runE2eTestWithCustomCommandRunner(cmdRunner, {(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+  		runE2eTestWithCustomCommandRunner(cmdRunner, {(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
 	  		//GIVEN some p4 workspace history
   		  	val pathToSallysWorkspace = tempPath("sallysP4")
 	  		val sallysSpec = createP4Workspace("sally", pathToSallysWorkspace, shell)
@@ -191,7 +192,7 @@ class GitP4ConduitE2ETest {
 	
 	  		p4(sallysSpec, shell).doCommand("edit", sallysADotTxt.getAbsolutePath())
 	  		p4(sallysSpec, shell).doCommand("submit", "-d", "declared my nature as a tree")
-	  		conduit.push();
+	  		conduit.pullChangesFromPerforce();
 	  		
   		  	//WHEN branch it in git, then add some stuff
   		  	val branch = tempPath("myclone")
@@ -209,7 +210,7 @@ class GitP4ConduitE2ETest {
 	
 	@Test
 	def conduitFailsCleanlyWhenIncomingGitChangesResultInMergeConflicts() {
-		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
 		  // GIVEN:
 		  
 		  // 1) an existing conduit with some initial history
@@ -224,7 +225,7 @@ class GitP4ConduitE2ETest {
 			
 		  p4(sallysSpec, shell).doCommand("edit", sallysADotTxt.getAbsolutePath())
 		  p4(sallysSpec, shell).doCommand("submit", "-d", "declared my nature as a tree")
-		  conduit.push();
+		  conduit.pullChangesFromPerforce();
 		  
 		  // 2) a git clone at that point in the history
 		  
@@ -235,7 +236,7 @@ class GitP4ConduitE2ETest {
 		  p4(sallysSpec, shell).doCommand("edit", "README.md")
 		  sallysADotTxt.write("I am a pine")
 		  p4(sallysSpec, shell).doCommand("submit", "-d", "clarified my treeishness")
-		  conduit.push();
+		  conduit.pullChangesFromPerforce();
 		  
 		  def currentRev() = runGit(shell, spec.localPath, "log", "-1", "--format=%H").trim();
 		  
@@ -252,7 +253,7 @@ class GitP4ConduitE2ETest {
 		  // WHEN:
 		  // the conduit is asked to push the conflicting history through to perforce
 		  val error = try {
-			  conduit.pull(branch, larrysCredentials)
+			  conduit.pushChangesToPerforce(branch, larrysCredentials)
 			  null
 		  }catch{
 		    case e:Throwable=> {
@@ -283,7 +284,7 @@ class GitP4ConduitE2ETest {
 	
     @Test
     def aGitPushThatContainsMultipleNewCommitsShouldTranslateToMultipleP4Changelists() {
-        runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+        runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
             
             // GIVEN: A new conduit connected to a depot with an empty history, and a git branch with one change
             val myclone = tempPath("myclone");
@@ -319,7 +320,7 @@ class GitP4ConduitE2ETest {
                 runGit(shell, myclone, "commit", "-m", "Edited b.txt")
             }
             // when: the change is submitted to the conduit
-            val changesFlowed = conduit.pull(myclone, new P4Credentials("larry", ""))
+            val changesFlowed = conduit.pushChangesToPerforce(myclone, new P4Credentials("larry", ""))
             
             // then: 
             assertTrue("Some changes should make their way to perforce", changesFlowed)
@@ -401,7 +402,7 @@ class GitP4ConduitE2ETest {
     
     @Test
     def checksForPendingChangelistsBeforeDoingAnythingElse() {
-        runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+        runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
             
             
             // given
@@ -410,11 +411,11 @@ class GitP4ConduitE2ETest {
             shell.run("git", "clone", spec.localPath, myclone)
             val mockShell = new MockShell("output-from-command")
             
-            val conduit = new GitP4Conduit(spec.localPath, mockShell, System.out)
+            val conduit = new GitToP4Pump(spec.localPath, mockShell, System.out)
             
             // when
             val errorThrown = try{
-              conduit.pull(myclone, new P4Credentials("larry", ""))
+              conduit.pushChangesToPerforce(myclone, new P4Credentials("larry", ""))
               None
             }catch{
               case e:Throwable => Some(e)
@@ -429,7 +430,7 @@ class GitP4ConduitE2ETest {
 	
     @Test
     def rollbackShouldRemoveTheUsersPendingChangelistAndRollbackTheirFiles() {
-        runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+        runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
             
             val aDotTxt = spec.localPath/"a.txt" 
             
@@ -481,7 +482,7 @@ class GitP4ConduitE2ETest {
     
 	@Test
 	def usersCanPushToABlankDepotThroughANewConduit() {
-		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
 		  	
 			// GIVEN: A new conduit connected to a depot with an empty history, and a git branch with one change
 			val myclone = tempPath("myclone")
@@ -494,7 +495,7 @@ class GitP4ConduitE2ETest {
 			val haveBefore = p4(spec, shell).doCommand("have")
 			
 			// when: the change is submitted to the conduit
-			val changesFlowed = conduit.pull(myclone, new P4Credentials("larry", ""))
+			val changesFlowed = conduit.pushChangesToPerforce(myclone, new P4Credentials("larry", ""))
 			
 			// then: 
 			assertTrue("Some changes should make their way to perforce", changesFlowed)
@@ -531,7 +532,7 @@ class GitP4ConduitE2ETest {
 	
 	@Test
 	def usersCanPullASimpleP4AddToAGitBranch() {
-		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitP4Conduit) =>
+		runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
 		  
 		  // GIVEN:
 		  
@@ -550,7 +551,7 @@ class GitP4ConduitE2ETest {
 			
 			
 			// when
-			conduit.push()
+			conduit.pullChangesFromPerforce()
 			
 			// then
 			{
@@ -603,7 +604,7 @@ class GitP4ConduitE2ETest {
 		sallysSpec
 	}
 	
-	def runE2eTestWithCustomCommandRunner(shell:CommandRunner, test:(CommandRunner, ClientSpec, GitP4Conduit)=> Unit) {
+	def runE2eTestWithCustomCommandRunner(shell:CommandRunner, test:(CommandRunner, ClientSpec, GitToP4Pump)=> Unit) {
 		val path = tempDir("conduit")
 		
 		// start p4 server
@@ -638,7 +639,7 @@ class GitP4ConduitE2ETest {
 		}
 	}
 	
-	def runE2eTest(test:(CommandRunner, ClientSpec, GitP4Conduit)=>Unit) {
+	def runE2eTest(test:(CommandRunner, ClientSpec, GitToP4Pump)=>Unit) {
 		runE2eTestWithCustomCommandRunner(new CommandRunnerImpl(System.out, System.err), test)
 	}
   
@@ -690,11 +691,11 @@ class GitP4ConduitE2ETest {
 	}
 	
 	def  createGitConduit(spec:ClientSpec, shell:CommandRunner) = {
-		GitP4Conduit.create(new P4DepotAddress("localhost:1666"), spec, 0, shell, new P4Credentials(spec.owner, null), System.out)
+		GitToP4Pump.create(new P4DepotAddress("localhost:1666"), spec, 0, shell, new P4Credentials(spec.owner, null), System.out)
   
 		println("Starting conduit")
-		val conduit = new GitP4Conduit(spec.localPath, shell, System.out)
-		conduit.push()
+		val conduit = new GitToP4Pump(spec.localPath, shell, System.out)
+		conduit.pullChangesFromPerforce()
 		println("Started conduit")
 		conduit
 	}

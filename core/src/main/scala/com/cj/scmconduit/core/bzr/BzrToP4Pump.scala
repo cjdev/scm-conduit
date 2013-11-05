@@ -1,26 +1,19 @@
-package com.cj.scmconduit.core;
+package com.cj.scmconduit.core.bzr
 
 import java.io.{BufferedReader, ByteArrayInputStream, File, FileReader, StringReader, FileWriter, IOException, PrintStream}
-import java.util.regex.Pattern;
-
+import java.util.regex.Pattern
 import org.apache.commons.io.IOUtils
-import scala.collection.mutable.ListBuffer
 import scala.collection.JavaConversions._
+import org.apache.commons.io.FileUtils
+import com.cj.scmconduit.core.p4.{P4, P4Impl, P4ClientId, P4Credentials, P4DepotAddress, P4RevRangeSpec, P4RevSpec, P4Time, ClientSpec, createDummyInitialP4Commit}
+import com.cj.scmconduit.core.p4.P4SyncOutputParser.ChangeType
+import com.cj.scmconduit.core.util.CommandRunner
+import com.cj.scmconduit.core.RichFile._
+import com.cj.scmconduit.core.PumpState
+import com.cj.scmconduit.core.ScmPump
+import javax.xml.bind.annotation.XmlRootElement
 
-import org.apache.commons.io.FileUtils;
-
-import com.cj.scmconduit.core.bzr.BzrFile;
-import com.cj.scmconduit.core.bzr.BzrStatus;
-import com.cj.scmconduit.core.bzr.LogEntry;
-import com.cj.scmconduit.core.p4.{
-	P4, P4Impl, P4Changelist, P4ClientId, P4Credentials, 
-	P4DepotAddress, P4RevRangeSpec, P4RevSpec, P4SyncOutputParser, P4Time, ClientSpec, createDummyInitialP4Commit}
-import com.cj.scmconduit.core.p4.P4SyncOutputParser.{Change,ChangeType}
-import com.cj.scmconduit.core.util.CommandRunner;
-import com.cj.scmconduit.core.util.CommandRunnerImpl;
-import RichFile._
-
-object BzrP4Conduit {
+object BzrToP4Pump {
 
 	def toBzrCommitDateFormat(when:P4Time, p4TimeZoneOffsetInHours:Int):String = {
 		val p4TimeZoneOffsetInMinutes = p4TimeZoneOffsetInHours * 100;
@@ -32,7 +25,7 @@ object BzrP4Conduit {
 		);
 	}
 	
-	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials, out:PrintStream, observer:(Conduit)=>Unit = {c=>}) {
+	def create(p4Address:P4DepotAddress, spec:ClientSpec, p4FirstCL:Integer, shell:CommandRunner, credentials:P4Credentials, out:PrintStream, observer:(ScmPump)=>Unit = {c=>}) {
 			val p4:P4 = new P4Impl(
 					p4Address, 
 					new P4ClientId(spec.clientId),
@@ -61,14 +54,14 @@ object BzrP4Conduit {
 				</scm-conduit-state>
 			    )
 			    
-           val conduit = new BzrP4Conduit(spec.localPath, shell, out)
+           val conduit = new BzrToP4Pump(spec.localPath, shell, out)
            observer(conduit);
            createDummyInitialP4Commit(spec.localPath, p4, conduit)
 
 	}
 }
 
-class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner, private val out:PrintStream) extends Conduit {
+class BzrToP4Pump(private val conduitPath:File, private val shell:CommandRunner, private val out:PrintStream) extends ScmPump {
 	private val TEMP_FILE_NAME = ".scm-conduit-temp"
 	private val META_FILE_NAME = ".scm-conduit"
  
@@ -96,11 +89,11 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		try{
 			FileUtils.deleteDirectory(conduitPath);
 		}catch{
-		  case _ => shell.run("rm", "-rf", conduitPath.getAbsolutePath())
+		  case _:Throwable => shell.run("rm", "-rf", conduitPath.getAbsolutePath())
 		}
 	}
 		
-	override def push() { 
+	override def pullChangesFromPerforce() { 
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
 
 		var keepPumping = true;
@@ -142,7 +135,7 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 
 				runBzr("commit", 
 						"--author=" + nextChange.whoString(),
-						"--commit-time=" + BzrP4Conduit.toBzrCommitDateFormat(nextChange.getWhen(), p4TimeZoneOffset),
+						"--commit-time=" + BzrToP4Pump.toBzrCommitDateFormat(nextChange.getWhen(), p4TimeZoneOffset),
 						"--unchanged",
 						"-m", "[P4 CHANGELIST " + nextChange.id() + "]\n" + nextChange.description());
 				assertNoBzrChanges();
@@ -186,10 +179,10 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		path
 	}
 
-	private def state() = ConduitState.read(new File(conduitPath, META_FILE_NAME));
+	private def state() = PumpState.read(new File(conduitPath, META_FILE_NAME));
 
-	private def writeState(state:ConduitState ){
-		ConduitState.write(state, new File(conduitPath, META_FILE_NAME));
+	private def writeState(state:PumpState ){
+		PumpState.write(state, new File(conduitPath, META_FILE_NAME));
 	}
 
 	private def findLastSyncRevision() = state().lastSyncedP4Changelist
@@ -286,7 +279,7 @@ class BzrP4Conduit(private val conduitPath:File, private val shell:CommandRunner
 		}
 	}
 
-	override def pull(source:String, using:P4Credentials):Boolean = {
+	override def pushChangesToPerforce(source:String, using:P4Credentials):Boolean = {
 
 		if(!BzrStatus.read(runBzr("xmlstatus")).isUnchanged()){
 			throw new RuntimeException("There are unsaved changes.  You need to roll back.");

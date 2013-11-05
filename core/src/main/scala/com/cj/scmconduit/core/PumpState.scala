@@ -10,14 +10,14 @@ import javax.xml.bind.annotation.XmlRootElement
 import scala.reflect.BeanProperty
 import scala.annotation.target.beanGetter
 
-object ConduitState {
-  def read(path:File) = jaxb().createUnmarshaller().unmarshal(path).asInstanceOf[ConduitState]
-  def write(state:ConduitState, path:File) = jaxb().createMarshaller().marshal(state, path)
-  def jaxb() = JAXBContext.newInstance(classOf[ConduitState]);
+object PumpState {
+  def read(path:File) = jaxb().createUnmarshaller().unmarshal(path).asInstanceOf[PumpState]
+  def write(state:PumpState, path:File) = jaxb().createMarshaller().marshal(state, path)
+  def jaxb() = JAXBContext.newInstance(classOf[PumpState]);
 }
 
 @XmlRootElement(name="scm-conduit-state")
-class ConduitState(
+class PumpState(
 	@(XmlElement @beanGetter)(name="last-synced-p4-changelist") @BeanProperty
 	var lastSyncedP4Changelist:Long, 
 

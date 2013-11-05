@@ -1,24 +1,18 @@
-package com.cj.scmconduit.server.conduit;
+package com.cj.scmconduit.server.session;
 
 import java.io.File;
 import java.net.URI;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.sshd.SshServer;
 
 import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.util.CommandRunner;
 
-public class PushSession {
+public class CodeSubmissionSession {
 	public enum State {WAITING_FOR_INPUT, WORKING, FINISHED}
 	
-	public interface PushStrategy {
-		void prepareDestinationDirectory(Integer sessionId, URI publicUri, File conduitLocation, File codePath, CommandRunner shell);
-		void configureSshDaemon(SshServer sshd, final File path, int port);
-	}
-	
-	private PushSession.State state = State.WAITING_FOR_INPUT;
+	private CodeSubmissionSession.State state = State.WAITING_FOR_INPUT;
 
 	private final Log log = LogFactory.getLog(getClass());
 	private final Integer pushId;
@@ -29,14 +23,15 @@ public class PushSession {
 	
 	private boolean hadErrors = false;
 	private String explanation;
+	private final Pusher pusher;
 
-	PushSession(String conduitName, Integer id, URI publicUri, File conduitLocation, File onDisk, PushStrategy strategy, CommandRunner shell, final P4Credentials credentials) {
+	public CodeSubmissionSession(String conduitName, Integer id, URI publicUri, File conduitLocation, File onDisk, SessionPrepStrategy strategy, CommandRunner shell, final P4Credentials credentials, final Pusher pusher) {
 	    this.conduitName = conduitName;
 		this.pushId = id;
 		this.onDisk = onDisk;
 		this.credentials = credentials;
+		this.pusher = pusher;
 		strategy.prepareDestinationDirectory(id, publicUri, conduitLocation, codePath(), shell);
-		
 	}
 	
 	public boolean hadErrors(){
@@ -51,7 +46,7 @@ public class PushSession {
 		return pushId;
 	}
 	
-	public PushSession.State state() {
+	public CodeSubmissionSession.State state() {
 		return state;
 	}
 	
@@ -62,41 +57,22 @@ public class PushSession {
 		log.debug(getClass().getSimpleName() + " is finished: " + state + "  " + explanation);
 	}
 	
-	public void inputReceived(final Pusher pusher){
+	public void inputReceived(){
 		File codeLocation = codePath();
-		state = PushSession.State.WORKING;
+		state = CodeSubmissionSession.State.WORKING;
 		log.info("Input received at " + codeLocation);
-		
-		/*
-		 * if(hookUrl){
-		 *    expose push session via ssh
-		 *    post message to hookUrl:
-		 *       {
-		 *           "url":"sftp://fobar.com:343/myUrl"
-		 *       }
-		 *    expect 3xx response
-		 *    Poll LOCATION
-		 *       {
-		 *         "status":"ACCEPTED"|"REJECTED"|"ANALYZING",
-		 *         "url":"build.dev.cj.com/cjo-gate"
-		 *       }
-		 *  }
-		 */
 		
 		pusher.submitPush(codeLocation, credentials, new Pusher.PushListener() {
 			public void pushSucceeded() {
 				log.info("Push succeeded: " + explanation);
-				close();
 				markAsFinished(false, "IT WORKED");
 			}
 			public void nothingToPush() {
 				log.info("There was nothing to push");
-				close();
 				markAsFinished(false, "There was nothing to push");
 			}
 			public void pushFailed(String explanation) {
 				log.info("Push failed: " + explanation);
-				close();
 				markAsFinished(true, "THE PUSH FAILED: " + explanation);
 			}
 		});
@@ -104,9 +80,6 @@ public class PushSession {
 	
 	private File codePath() {
 		return new File(localPath(), conduitName);
-	}
-
-	synchronized void close(){
 	}
 
     public File localPath() {

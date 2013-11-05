@@ -1,4 +1,4 @@
-package com.cj.scmconduit.server;
+package com.cj.scmconduit.server.ui;
 
 import org.httpobjects.HttpObject;
 import org.httpobjects.Request;
@@ -43,12 +43,8 @@ public class AddConduitResource extends HttpObject {
 			String p4path = req.getParameter("p4path");
 			Integer p4FirstCL = Integer.parseInt(req.getParameter("p4FirstCL"));
 			
-//			if(name.contains("-")){
-//				return OK(Text("Sorry, conduit names must not contain hyphens"));
-//			}else{
-				listener.addConduit(type, name, p4path, p4FirstCL);
-				return SEE_OTHER(new LocationField("/"));
-//			}
+			listener.addConduit(type, name, p4path, p4FirstCL);
+			return SEE_OTHER(new LocationField("/"));
 			
 		}catch(Exception e){
 			return OK(Text("Sorry, there was an error: " + toString(e)));

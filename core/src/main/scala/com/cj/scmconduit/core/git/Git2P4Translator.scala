@@ -1,4 +1,4 @@
-package com.cj.scmconduit.core;
+package com.cj.scmconduit.core.git
 
 import java.io.ByteArrayInputStream
 import java.util.regex.Pattern
@@ -9,7 +9,7 @@ import scala.collection.JavaConversions._
 import java.io.BufferedReader
 import java.io.StringReader
 
-class Translator(private val p4:P4) {
+class Git2P4Translator(private val p4:P4) {
 	
 	def translate(info:GitRevisionInfo):Integer = {
 		val changeListNum = createP4ChangelistWithMessage(info.message, p4);

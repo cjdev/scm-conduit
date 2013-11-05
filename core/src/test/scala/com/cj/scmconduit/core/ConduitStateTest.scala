@@ -35,11 +35,11 @@ class ConduitStateTest {
 					<p4-client-id>larrys-client</p4-client-id>
 				</scm-conduit-state>
       
-    val jaxb = JAXBContext.newInstance(classOf[ConduitState])
+    val jaxb = JAXBContext.newInstance(classOf[PumpState])
     
       
     // WHEN
-    val state = jaxb.createUnmarshaller().unmarshal(new StringReader(xml.toString())).asInstanceOf[ConduitState]  
+    val state = jaxb.createUnmarshaller().unmarshal(new StringReader(xml.toString())).asInstanceOf[PumpState]  
 
     // THEN
     assertEquals("localhost:1666", state.p4Port)
@@ -52,14 +52,14 @@ class ConduitStateTest {
   def isSerializable(){
     // GIVEN
     val f = tempFile()
-    val state = new ConduitState(
+    val state = new PumpState(
     				lastSyncedP4Changelist=232, p4Port="superhost:233", 
     				p4ReadUser="larry", p4ClientId="larry's workspace")
     
     // WHEN
-    ConduitState.write(state, f)
+    PumpState.write(state, f)
     println(FileUtils.readFileToString(f))
-    val result = ConduitState.read(f)
+    val result = PumpState.read(f)
 
     // THEN
     assertEquals("superhost:233", state.p4Port)

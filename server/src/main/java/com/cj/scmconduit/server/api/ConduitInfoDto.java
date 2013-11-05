@@ -1,6 +1,6 @@
 package com.cj.scmconduit.server.api;
 
-import com.cj.scmconduit.server.conduit.ConduitState;
+import com.cj.scmconduit.server.session.ConduitState;
 
 public class ConduitInfoDto {
 	public String name, p4path, readOnlyUrl, apiUrl, logUrl;

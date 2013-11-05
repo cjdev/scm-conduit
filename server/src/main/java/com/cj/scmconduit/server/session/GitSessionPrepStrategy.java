@@ -1,4 +1,4 @@
-package com.cj.scmconduit.server.conduit;
+package com.cj.scmconduit.server.session;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,13 +15,13 @@ import org.apache.sshd.server.command.ScpCommandFactory;
 import org.apache.sshd.server.shell.ProcessShellFactory;
 
 import com.cj.scmconduit.core.util.CommandRunner;
-import com.cj.scmconduit.server.conduit.PushSession.PushStrategy;
+import com.cj.scmconduit.server.ssh.ShellCommand;
 
-public class GitPushStrategy implements PushStrategy {
+public class GitSessionPrepStrategy implements SessionPrepStrategy {
 	private final Log log = LogFactory.getLog(getClass());
 	private final String conduitName;
 	
-	public GitPushStrategy(String conduitName) {
+	public GitSessionPrepStrategy(String conduitName) {
         super();
         this.conduitName = conduitName;
     }

@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -64,26 +63,7 @@ public class P4DescribeOutputParser {
                         }
                 }
 			}
-//			for(String line = lines.readLine();line!=null;line = lines.readLine()){
-//				String file = "", workspacePath = "";
-//				ChangeType changeType = null;
-//				Integer fileVersion = null;
-//				
-//				for(Markers marker : phrases){
-//					final String phrase = marker.phrase;
-//					int sPos = line.indexOf(phrase);
-//					if(sPos!=-1){
-//						workspacePath = line.substring(sPos + phrase.length());
-//						String partA = line.substring(0, sPos);
-//						int poundPos = partA.lastIndexOf('#');
-//						fileVersion = Integer.parseInt(partA.substring(poundPos+1));
-//						file = partA.substring(0, poundPos);
-//						changeType = marker.signifies;
-//						changes.add(new Change(changeType, file, workspacePath, fileVersion));
-//						break;
-//					}
-//				}
-//			}
+			
 			return changes;
 		} catch (IOException e) {
 			throw new RuntimeException(e);

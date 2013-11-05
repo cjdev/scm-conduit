@@ -1,4 +1,4 @@
-package com.cj.scmconduit.server.jetty;
+package com.cj.scmconduit.server;
 
 import java.util.regex.Pattern;
 
@@ -8,21 +8,18 @@ import org.httpobjects.HttpObject;
 import org.httpobjects.Request;
 import org.httpobjects.Response;
 
-import com.cj.scmconduit.server.conduit.ConduitController;
-import com.cj.scmconduit.server.conduit.PushSession;
-import com.cj.scmconduit.server.conduit.PushSession.State;
+import com.cj.scmconduit.server.session.CodeSubmissionSession;
+import com.cj.scmconduit.server.session.CodeSubmissionSession.State;
 
-public class ConduitHandler extends HttpObject {
+public class ConduitHttpResource extends HttpObject {
 	
-	private final Log log;
 	public final String name;
-	private final ConduitController controller;
+	private final ConduitOrchestrator orchestrator;
 	
-	public ConduitHandler(String name, ConduitController controller) {
+	public ConduitHttpResource(String name, ConduitOrchestrator orchestrator) {
 		super(name + "/{remainder*}");
 		this.name = name;
-		log = LogFactory.getLog(getClass()+":" + name);
-		this.controller = controller;
+		this.orchestrator = orchestrator;
 	}
 
 	@Override
@@ -30,19 +27,19 @@ public class ConduitHandler extends HttpObject {
 		final String remainder = req.pathVars().valueFor("remainder");
 		final Integer sessionId = parseSessionId(remainder);
 		if(sessionId==null) return NOT_FOUND();
-		final PushSession session = controller.sessions().get(sessionId);
+		final CodeSubmissionSession session = orchestrator.sessions().get(sessionId);
 		
 		final Response r;
 		
 		if(session!=null){
 			final State state = session.state();
 			
-			if(state == PushSession.State.WAITING_FOR_INPUT){
-				session.inputReceived(controller);
+			if(state == CodeSubmissionSession.State.WAITING_FOR_INPUT){
+				session.inputReceived();
 				r = OK(Text("WORKING"));
-			}else if(state == PushSession.State.WORKING){
+			}else if(state == CodeSubmissionSession.State.WORKING){
 				r = OK(Text("WORKING"));
-			}else if(state == PushSession.State.FINISHED){
+			}else if(state == CodeSubmissionSession.State.FINISHED){
 				if(session.hadErrors()){
 					r = OK(Text("ERROR:" + session.explanation()));
 				}else{

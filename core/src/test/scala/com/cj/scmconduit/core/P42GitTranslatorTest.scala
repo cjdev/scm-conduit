@@ -6,6 +6,7 @@ import com.cj.scmconduit.core.p4.P4Changelist
 import com.cj.scmconduit.core.p4.P4Time
 import scala.collection.JavaConversions._
 import org.junit.Assert._
+import com.cj.scmconduit.core.git.P42GitTranslator
 
 class P42GitTranslatorTest {
 	
