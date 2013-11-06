@@ -135,8 +135,8 @@
 			<version>140</version>
 		</dependency>
 		<dependency>
-			<groupId>com.cj.scmconduit.core</groupId>
-			<artifactId>scm-conduit-core</artifactId>
+			<groupId>com.cj.scmconduit.pump</groupId>
+			<artifactId>scm-conduit-pump</artifactId>
 			<version>${project.version}</version>
 		</dependency>
 		<dependency>

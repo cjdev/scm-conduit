@@ -7,8 +7,8 @@
 		<version>0.2.0-SNAPSHOT</version>
 	</parent>
 	
-	<groupId>com.cj.scmconduit.core</groupId>
-	<artifactId>scm-conduit-core</artifactId>
+	<groupId>com.cj.scmconduit.pump</groupId>
+	<artifactId>scm-conduit-pump</artifactId>
 	
 	<name>${project.artifactId}</name>
 	

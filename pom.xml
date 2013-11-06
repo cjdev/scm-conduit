@@ -27,8 +27,8 @@
 	</build>
 	
 	<modules>
-		<module>server</module>
-		<module>core</module>
+	<module>server</module>
+	<module>pump</module>
         <module>git</module>
         <module>bzr</module>
         <module>p4</module>
