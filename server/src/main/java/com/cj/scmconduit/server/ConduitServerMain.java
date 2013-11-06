@@ -101,10 +101,6 @@ public class ConduitServerMain {
 	private final File tempDirPath;
 	private final File path;
 	private final Server jetty;
-	private final Map<String, String> credentials = new HashMap<String, String>();
-	{
-		credentials.put("someuser", "test");
-	}
 	private final String basePublicUrl;
 	private final P4DepotAddress p4Address;
 	private final TempDirAllocator allocator;
@@ -327,7 +323,7 @@ public class ConduitServerMain {
 	}
 	
 	
-	private <T> T readJackson(Representation representation, Class<? extends T> clazz){
+	private static <T> T readJackson(Representation representation, Class<? extends T> clazz){
 	    try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             representation.write(bytes);
@@ -337,7 +333,7 @@ public class ConduitServerMain {
         }
 	}
 	
-	private void mkdirs(File path){
+	private static void mkdirs(File path){
 		if(!path.isDirectory() && !path.mkdirs()){
 			throw new RuntimeException("Directory does not exist and I could not create it: " + path.getAbsolutePath());
 		}
@@ -458,10 +454,6 @@ public class ConduitServerMain {
 				creationThreads.remove(this);
 			}
 		}
-	}
-	
-	interface MethodInvoker {
-		Response invoke(Request req, HttpObject o);
 	}
 	
 	class ConduitDiscoveryResult {
