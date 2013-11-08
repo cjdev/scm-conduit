@@ -63,7 +63,7 @@ public class ShellCommand implements Command, SessionAware{
                     File path = session.getAttribute(LOCAL_PATH);
                     log.debug("Executing in " + path);
                     
-                    log.debug("YO: I was asked to create this command: " + command);
+                    log.debug("I was asked to create this command: " + command);
                     final String realCommand = command.replaceAll(Pattern.quote("'/" + conduitName + "'"), new File(path, conduitName).getAbsolutePath());
                     log.debug("I changed the command to " + realCommand);
                     String[] cmd = realCommand.split(Pattern.quote(" "));
