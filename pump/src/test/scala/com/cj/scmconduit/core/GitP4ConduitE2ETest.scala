@@ -37,6 +37,76 @@ class GitToP4PumpE2ETest {
   }
  
   @Test
+  def doesForceSync(){
+    
+    runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
+    // given: 
+    {// An existing file in perforce
+        val pathToWorkspace = tempPath("initp4")
+
+                val iSpec = createP4Workspace("MrSetup", pathToWorkspace, shell)
+
+                val readmeDotMd = pathToWorkspace/"README.md" 
+
+                readmeDotMd.delete()
+                readmeDotMd.write("Coming soon...")
+
+                p4(iSpec, shell).doCommand("edit", readmeDotMd.getAbsolutePath())
+                p4(iSpec, shell).doCommand("submit", "-d", "Initial submit")
+                conduit.pullChangesFromPerforce()
+    }
+
+    {// some bogus local changes
+        val pathToReadme = spec.localPath/"README.md";
+        runGit(shell, spec.localPath, "rm", pathToReadme)
+        runGit(shell, spec.localPath, "commit", "-m", "crazy stuff")
+        runGit(shell, spec.localPath, "tag", "cl3")
+
+    }
+
+    // when
+    conduit.forceSync()
+
+    // then
+      
+    val pathToReadme = spec.localPath/"README.md";
+    assertEquals("Coming soon...", pathToReadme.readString)
+    assertEquals(Seq("cl1", "cl2"), runGit(shell, spec.localPath, "tag", "-l").lines.toList)
+
+    val expected = """    |commit [SOME HASH] (HEAD, master)
+                          |Author: Stuart Penrose <stu@penrose.us>
+                          |
+                          |    force sync
+                          |
+                          |commit [SOME HASH] (tag: cl2)
+                          |Author: MrSetup@MrSetup-client <MrSetup@MrSetup-client>
+                          |
+                          |    Initial submit
+                          |    
+                          |    [lives in perforce as CL#2]
+                          |
+                          |commit [SOME HASH] (tag: cl1)
+                          |Author: larry@larrys-client <larry@larrys-client>
+                          |
+                          |    initial commit
+                          |    
+                          |    [lives in perforce as CL#1]
+                          |
+                          |commit [SOME HASH]
+                          |Author: Stuart Penrose <stu@penrose.us>
+                          |
+                          |    created conduit""".stripMargin('|')
+                      
+    val actual = runGit(shell, spec.localPath, "log", "--decorate")
+                    .lines
+                    .filter(!_.startsWith("Date: "))
+                    .map(_.replaceAll("commit [0-9,a-z,A-Z]*", "commit [SOME HASH]"))
+                    .mkString("\n")
+    assertEquals(expected, actual)
+    }
+  }
+  
+  @Test
   def gracefullyHandlesRacesWithOtherPerforceUsers(){
     runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
         // GIVEN:

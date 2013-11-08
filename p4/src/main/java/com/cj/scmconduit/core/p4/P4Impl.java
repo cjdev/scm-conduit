@@ -39,11 +39,24 @@ public class P4Impl implements P4 {
 		return shell.runWithHiddenKey(P4_SHELL_COMMAND, credentials.password, withArgs(parts));
 	}
 	
+	@SuppressWarnings("serial")
+    @Override
+    public List<Change> syncTo(final P4RevSpec rev, final boolean force){
+	    
+	    List<String> args = new ArrayList<String>(){{
+	        add("sync");
+	        if(force) add("-f");
+	        add("..." + rev);
+	    }};
+	    
+        String output = shell.runWithHiddenKey(P4_SHELL_COMMAND, credentials.password, withArgs(args.toArray(new String[]{})));
+        P4SyncOutputParser parser = new P4SyncOutputParser();
+        return parser.parse(new StringReader(output));
+    }
+	
 	@Override
 	public List<Change> syncTo(P4RevSpec rev){
-		String output = shell.runWithHiddenKey(P4_SHELL_COMMAND, credentials.password, withArgs("sync", "..." + rev));
-		P4SyncOutputParser parser = new P4SyncOutputParser();
-		return parser.parse(new StringReader(output));
+		return syncTo(rev, false);
 	}
 	
 	@Override

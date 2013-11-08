@@ -41,7 +41,7 @@ public class ConduitOrchestrator implements Pusher {
 	private final PrintStream out;
 	private final URI publicUri;
 	private final File pathOnDisk;
-	private final List<PushRequest> requestQueue = new LinkedList<PushRequest>();
+	private final List<ConduitOperation> requestQueue = new LinkedList<ConduitOperation>();
 	private final ScmPump scmPump;
 	private final CommandRunner shell;
 	private final SessionPrepStrategy prepStrategy;
@@ -152,7 +152,17 @@ public class ConduitOrchestrator implements Pusher {
         return Collections.unmodifiableMap(pushes);
     }
 	
-	private static class PushRequest {
+	private interface ConduitOperation {
+	    void exec(ScmPump scmPump, PrintStream out);
+	}
+	
+    private static class ForceSyncRequest implements ConduitOperation {
+        public void exec(ScmPump scmPump, PrintStream out) {
+            scmPump.forceSync();
+        }
+    }
+    
+	private static class PushRequest implements ConduitOperation {
 		final File location;
 		final PushListener listener;
 		final P4Credentials credentials;
@@ -163,7 +173,43 @@ public class ConduitOrchestrator implements Pusher {
 			this.listener = listener;
 			this.credentials = credentials;
 		}
-
+		public void exec(ScmPump scmPump, PrintStream out) {
+	        try {
+	            String source = location.getAbsolutePath();
+	            out.println("Pulling from " + source);
+	            
+	            boolean changesWerePulled = scmPump.pushChangesToPerforce(source, credentials);
+	            if(changesWerePulled){
+	                out.println("Committing");
+	                scmPump.commit(credentials);
+	                listener.pushSucceeded();
+	            }else{
+	                listener.nothingToPush();
+	            }
+	        } catch (Exception e) {
+	            out.println("There was an error: " + e.getMessage());
+	            e.printStackTrace(System.out);
+	            
+	            List<Throwable> errors = new ArrayList<Throwable>();
+	            errors.add(e);
+	            
+	            try{
+	                scmPump.rollback(credentials);
+	            }catch(Throwable e2){
+	                e2.printStackTrace();
+	                errors.add(e2);
+	            }
+	            
+	            StringBuilder text = new StringBuilder("Error:");
+	            for(Throwable t : errors){
+	                text.append('\n');
+	                text.append(stackTrace(t));
+	            }
+	            listener.pushFailed(text.toString());
+	            return;
+	        }
+		    
+		}
 	}
 
 	public void submitPush(File location, final P4Credentials credentials, PushListener listener){
@@ -173,10 +219,10 @@ public class ConduitOrchestrator implements Pusher {
 		}
 	}
 
-	private PushRequest popNextRequest(){
+	private ConduitOperation popNextRequest(){
 		synchronized(requestQueue){
 			if(requestQueue.size()>0){
-				PushRequest r = requestQueue.get(0);
+			    ConduitOperation r = requestQueue.get(0);
 				requestQueue.remove(0);
 				return r;
 			}else{
@@ -195,11 +241,11 @@ public class ConduitOrchestrator implements Pusher {
 					try {
 						state = ConduitState.POLLING;
 						readFromPerforce();
-						PushRequest request = popNextRequest();
+						ConduitOperation request = popNextRequest();
 						if(request!=null){
 							state = ConduitState.SENDING;
 							out.println("Handling request: " + request);
-							handle(request);
+							request.exec(scmPump, out);
 						}else{
 							out.println("Sleeping");
 							state = ConduitState.IDLE;
@@ -230,45 +276,8 @@ public class ConduitOrchestrator implements Pusher {
 	    }
 	}
 	
-	private void handle(PushRequest request) {
-        final P4Credentials credentials = request.credentials;
-		try {
-			String source = request.location.getAbsolutePath();
-			out.println("Pulling from " + source);
-			
-			boolean changesWerePulled = scmPump.pushChangesToPerforce(source, credentials);
-			if(changesWerePulled){
-				out.println("Committing");
-				scmPump.commit(credentials);
-				request.listener.pushSucceeded();
-			}else{
-				request.listener.nothingToPush();
-			}
-		} catch (Exception e) {
-			out.println("There was an error: " + e.getMessage());
-			e.printStackTrace(System.out);
-			
-			List<Throwable> errors = new ArrayList<Throwable>();
-			errors.add(e);
-			
-			try{
-				scmPump.rollback(credentials);
-			}catch(Throwable e2){
-				e2.printStackTrace();
-				errors.add(e2);
-			}
-			
-			StringBuilder text = new StringBuilder("Error:");
-			for(Throwable t : errors){
-				text.append('\n');
-				text.append(stackTrace(t));
-			}
-			request.listener.pushFailed(text.toString());
-			return;
-		}
-	}
 
-	private String stackTrace(Throwable t){
+	private static String stackTrace(Throwable t){
 		try {
 			StringWriter s = new StringWriter();
 			PrintWriter w = new PrintWriter(s);

@@ -10,6 +10,7 @@ public interface P4 {
 	List<P4Changelist> changesBetween(P4RevRangeSpec range);
 
 	List<Change> syncTo(P4RevSpec rev);
+    List<Change> syncTo(P4RevSpec rev, boolean force);
 
 	String doCommand(String ... parts);
 

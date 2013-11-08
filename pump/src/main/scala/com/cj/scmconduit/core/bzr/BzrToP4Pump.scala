@@ -66,8 +66,8 @@ class BzrToP4Pump(private val conduitPath:File, private val shell:CommandRunner,
 	private val META_FILE_NAME = ".scm-conduit"
  
 	
-	private var p4Address:P4DepotAddress = new P4DepotAddress(state().p4Port)
-	private var p4:P4 = {
+	private val p4Address:P4DepotAddress = new P4DepotAddress(state().p4Port)
+	private val p4:P4 = {
 		val s = state();
 	    out.println(FileUtils.readFileToString(new File(conduitPath, META_FILE_NAME)))
 	    out.println("The port is " + s.p4Port)
@@ -201,6 +201,10 @@ class BzrToP4Pump(private val conduitPath:File, private val shell:CommandRunner,
 	}
     
 	private def tempFile() = {new File(conduitPath, TEMP_FILE_NAME)}
+	
+	override def forceSync(){
+	    throw new Exception("NOT IMPLEMENTED")
+	}
 	
 	override def commit(using:P4Credentials) {
 		

@@ -116,6 +116,37 @@ class GitToP4Pump(private val conduitPath:File, private val shell:CommandRunner,
 		}
 	}
 	
+	private def deleteChangelistTagsLargetThan(cl:Long){
+	  val tags = git.run("tag", "-l").split("\n").toSeq
+	  
+	  out.println("TAGS: " + tags.mkString(","))
+	  
+      val tagsToDelete = tags.filter(_.matches("cl[0-9]*"))
+                            .filter(_.substring(2).toLong > cl)
+      
+                            
+      out.println("TAGS TO DELETE: " + tagsToDelete.mkString(","))
+                            
+      tagsToDelete.foreach{tag=>
+            git.run("tag", "-d", tag)
+      }
+	}
+	
+	override def forceSync(){
+	  out.println("Doing a force-sync");
+      val cl = state().getLastSyncedP4Changelist()
+      
+      git.run("checkout", "master")
+      git.run("reset", "--hard", "cl" + cl)
+      
+      deleteChangelistTagsLargetThan(cl)
+      
+      p4.syncTo(P4RevSpec.forChangelist(cl), true)
+      git.run("add", "--all")
+      git.run("commit", "-m", "force sync")
+      
+	}
+	
 	override def pullChangesFromPerforce() {
         assertNoPendingChangelists();
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
