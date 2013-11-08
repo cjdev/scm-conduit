@@ -199,5 +199,7 @@ class TranslatorTest {
 	override def doCommand(parts:String*) = ""
 
 	override def doCommand(in:InputStream, args:String*) = ""
+	  
+    override def syncTo(rev:P4RevSpec, force:Boolean) = null
   }
 }
