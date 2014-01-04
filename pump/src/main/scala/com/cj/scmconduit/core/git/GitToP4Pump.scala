@@ -330,7 +330,12 @@ class GitToP4Pump(private val conduitPath:File, private val shell:CommandRunner,
 				this.out.println("Need to fetch " + line);
 				val rev = line.replaceAll(Pattern.quote("+"), "").trim();
 				git.run("merge", rev);
-				val log = git.run("log", "--name-status", lastRev + ".." + rev,  "--pretty=medium");
+				val log = git.run(
+				                "log", 
+				                "--name-status", 
+				                lastRev + ".." + rev,  
+				                "--pretty=medium"
+				                ,"-M");
 				this.out.println(log);
 				
 				val changes = new GitRevisionInfo(log);

@@ -435,24 +435,6 @@ class GitToP4PumpE2ETest {
               assertEquals(1, changes.size())
               println(changes)
             }
-//            changelists.foreach {changelist=>
-//            }
-//            
-//            // it should be on the next p4 CL
-//            val haveAfter = p4(spec, shell).doCommand("have")
-//            println("Has: " + haveAfter)
-//            assertTrue("The have list for the client should have changed", haveBefore != haveAfter)
-//            assertTrue("The client should have the files", haveAfter.contains("//depot/file.txt#1"))
-//            
-//            // there should be no git changes
-//            val gitChanges = runGit(shell, myclone, "status", "-s")
-//            assertEquals("", gitChanges)
-//            
-//            println(runGit(shell, myclone, "fetch", "--tags")) // synchronize tags with remote git conduit
-//            val taggedRev = toString(new File(myclone, ".git/refs/tags/cl2")).trim()
-//            val currentRev = runGit(shell, myclone, "log", "-1", "--format=%H").trim()
-//            
-//            assertEquals(currentRev, taggedRev)
         }
     }
     class MockShell (commandOutput:String) extends CommandRunner {
@@ -547,6 +529,72 @@ class GitToP4PumpE2ETest {
             
             val pendingChangelists = p4(spec, shell).doCommand("changes", "-s", "pending")
             assertEquals("", pendingChangelists)
+        }
+    }
+    
+    @Test
+    def gitRenamesAreSubmittedAsPerforceRenames() {
+        runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
+            // 1) an existing conduit with some initial history
+            val pathToSallysWorkspace = tempPath("sallysP4")
+            
+            val sallysSpec = createP4Workspace(
+                                    userName = "sally", 
+                                    where = pathToSallysWorkspace, 
+                                    shell)
+            val sallysP4 = p4(sallysSpec, shell)
+            
+            val sallysADotTxt = pathToSallysWorkspace/"hello.txt" 
+            
+            sallysADotTxt.write("hello world")
+            
+            sallysP4.doCommand("add", "hello.txt")
+            sallysP4.doCommand("submit", "-d", "added hello.txt")
+            
+            conduit.pullChangesFromPerforce()
+            
+            val myclone = tempPath("myclone")
+            shell.run("git", "clone", spec.localPath, myclone)
+            runGit(shell, myclone, "mv", "hello.txt", "welcome.txt")
+            runGit(shell, myclone, "commit", "-m", "Moved hello.txt to welcome.txt")
+            
+            // when: the change is submitted to the conduit
+            val changesFlowed = conduit.pushChangesToPerforce(myclone, new P4Credentials("larry", ""))
+            
+            // then: 
+            assertTrue("Some changes should make their way to perforce", changesFlowed)
+            
+            // there should be no p4 opened files
+            val actual = p4(spec, shell).doCommand("describe", "-ds", "3")
+                                        .replaceFirst(
+                                            "Change 3 by larry@larrys-client on .*", 
+                                            "Change 3 by larry@larrys-client on SOME_DATE")
+                                        .trim
+            
+            val expected = """
+                |Change 3 by larry@larrys-client on SOME_DATE
+                |
+                |	Moved hello.txt to welcome.txt
+                |
+                |Affected files ...
+                |
+                |... //depot/hello.txt#2 move/delete
+                |... //depot/welcome.txt#1 move/add
+                |
+                |Moved files ...
+                |
+                |... //depot/welcome.txt#1 moved from //depot/hello.txt#1
+                |
+                |Differences ...
+                |
+                |==== //depot/welcome.txt#1 (text) ====
+                |
+                |add 0 chunks 0 lines
+                |deleted 0 chunks 0 lines
+                |changed 0 chunks 0 / 0 lines""".trim.stripMargin('|')
+            
+            assertEquals(expected, actual)
+                            
         }
     }
     
