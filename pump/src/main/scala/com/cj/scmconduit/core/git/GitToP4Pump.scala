@@ -211,8 +211,9 @@ class GitToP4Pump(private val conduitPath:File, private val shell:CommandRunner,
 	    git.run("checkout", "master")
 	    git.run("rebase", p4LatestBranchName)
 	    
-        git.run("branch", "-d", p4LatestBranchName)
-        git.run("update-server-info")
+	    git.run("branch", "-d", p4LatestBranchName)
+	    git.run("update-server-info")
+	    git.run("reflog", "expire", "--expire=30", "--all")
 	}
 	
 	private def findP4TimeZoneOffset():Int = {
@@ -356,6 +357,7 @@ class GitToP4Pump(private val conduitPath:File, private val shell:CommandRunner,
 			}
 			
 			git.run("update-server-info")
+			git.run("reflog", "expire", "--expire=30", "--all")
 			return true;
 		}
 	}
