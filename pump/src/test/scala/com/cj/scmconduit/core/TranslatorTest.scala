@@ -178,7 +178,7 @@ class TranslatorTest {
 			"jerry lee lewis",
 			"2012-03-02 23:00 PDT",
 			"xyz123",
-			"I am legend"
+			"I\nam\n$legend"
     )
     
     // WHEN
@@ -186,7 +186,7 @@ class TranslatorTest {
     
     // THEN
     println("change: " + changeDescription)
-    assertTrue("Should have translated the commit message", changeDescription.contains("I am legend"))
+    assertTrue("Should have translated the commit message", changeDescription.contains("I\nam\n$legend"))
   }
   
   

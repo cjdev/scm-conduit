@@ -32,16 +32,12 @@ class Git2P4Translator(private val p4:P4) {
 	}
 
 	private def createP4ChangelistWithMessage(message:String,  p4:P4):Integer = {
-	    val lineCount = numLines(message)
-	    if(lineCount > 1){
-	      throw new RuntimeException(s"I don't support multi-line commit messages, but you gave me a message with $lineCount lines:\n" + message)
-	    }
-		val changelistText = p4.doCommand("changelist", "-o").replaceAll(Pattern.quote("<enter description here>"), message);
+            val changelistText = p4.doCommand("changelist", "-o").replaceAllLiterally("<enter description here>", message);
 
-		val changeListNum = createChangelist(changelistText, p4);
-		return changeListNum;
+            val changeListNum = createChangelist(changelistText, p4);
+            return changeListNum;
 	}
-	
+
 	private def numLines(text:String) = {
 	  val reader = new BufferedReader(new StringReader(text))
 	  var numLines = 0
