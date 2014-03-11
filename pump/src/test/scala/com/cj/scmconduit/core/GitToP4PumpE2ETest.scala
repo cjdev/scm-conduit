@@ -106,6 +106,128 @@ class GitToP4PumpE2ETest {
     }
   }
   
+  
+  class CommandRunnerThatBlocks extends CommandRunnerImpl(System.out, System.err){
+    var blockCommand:Option[Array[String]] = None
+    var toRun:()=>Unit = {()=>}
+    
+    def blockAndRun(cmd:Array[String], foo:()=>Unit) {
+      println("Setting command " + cmd.mkString(" "))
+      blockCommand = Some(cmd)
+      this.toRun = foo
+    }
+    
+    def resume(){
+      this.synchronized{
+        this.notifyAll()
+      }
+    }
+    
+    override def runWithHiddenKey(command:String, hideKey:String, args:String*):String = {
+      println("BLOCKING COMMAND RUNNER: (" + blockCommand.isDefined + ")" + command + " " + args.mkString(" "))
+      blockCommand match {
+        case Some(blockArgs) => this.synchronized{
+          if(blockArgs.length <= args.length){
+              val equiv = args.subList(args.size-blockArgs.size, args.size).toList
+              val b = blockArgs.toList
+              println("COMPARE:" + equiv + " vs " + b)
+              
+              if(equiv == b){
+                  println("Blocking on " + blockCommand.get)
+                  toRun()
+                  blockCommand = None
+              }
+          }
+        }
+        case None=>
+      }
+      
+      super.runWithHiddenKey(command, hideKey, args:_*);
+    }
+  }
+  
+  @Test
+  def tagsTheFinalChangelistWhenItDiffersFromThePendingChangelist(){
+    val cmd = new CommandRunnerThatBlocks()
+    
+    runE2eTestWithCustomCommandRunner(cmd, {(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>
+        // GIVEN:
+      
+        {// An existing file in perforce
+            val pathToWorkspace = tempPath("initp4")
+            
+            val iSpec = createP4Workspace("MrSetup", pathToWorkspace, shell)
+            
+            val readmeDotMd = pathToWorkspace/"README.md" 
+            
+            readmeDotMd.delete()
+            readmeDotMd.write("Coming soon...")
+            
+            p4(iSpec, shell).doCommand("edit", readmeDotMd.getAbsolutePath())
+            p4(iSpec, shell).doCommand("submit", "-d", "Initial submit")
+            conduit.pullChangesFromPerforce()
+        }
+          
+        cmd.blockAndRun("-u larry -P  submit -c 3".split(" "), {()=>
+          
+            System.out.println("Waiting...");
+            println("OK!")
+            
+            
+            {// A perforce user's submission
+                val pathToSallysWorkspace = tempPath("sallysP4")
+                
+                val sallysSpec = createP4Workspace("sally", pathToSallysWorkspace, shell)
+                
+                val sallyDotTxt = pathToSallysWorkspace/"sally.txt" 
+                
+                sallyDotTxt.delete()
+                sallyDotTxt.write("I am mankind")
+                
+                p4(sallysSpec, shell).doCommand("add", sallyDotTxt.getAbsolutePath())
+                p4(sallysSpec, shell).doCommand("submit", "-d", "Added a file wherein I have declared my kind")
+            }
+        })
+        
+        {// A git user's conduit submission
+            val pathToFredsClone = tempPath("fredsP4")
+            shell.run("git", "clone", spec.localPath.getAbsolutePath(), pathToFredsClone.getAbsolutePath())
+            
+            val readmeDotMd = pathToFredsClone/"README.md" 
+            
+            readmeDotMd.write("Welcome to the project!")
+            runGit(shell, pathToFredsClone, "add", "--all")
+            runGit(shell, pathToFredsClone, "commit", "-m", "Fleshed-out the REAME.md a little")
+            
+            conduit.pushChangesToPerforce(pathToFredsClone, new P4Credentials("larry", ""))
+            
+            
+            conduit.pullChangesFromPerforce()
+            runGit(shell, pathToFredsClone, "pull")
+            println(runGit(shell, pathToFredsClone, "log", "--decorate"))
+            val tags = runGit(shell, pathToFredsClone, "tag")
+            println(tags);
+            assertFalse(tags.contains("cl3"))
+        }
+        
+        
+//        // WHEN:
+//        
+//        // THEN:
+//          
+//        {// the git user's changes should be there
+//          val pathToReadme = spec.localPath/"README.md";
+//          assertEquals("Welcome to the project!", pathToReadme.readString)
+//        }
+//        {// the p4 user's changes should be there
+//          val pathToSallyDotTxt = spec.localPath/"sally.txt" ;
+//          assertEquals("I am mankind", pathToSallyDotTxt.readString)
+//        }
+
+    });
+  }
+  
+  
   @Test
   def gracefullyHandlesRacesWithOtherPerforceUsers(){
     runE2eTest{(shell:CommandRunner, spec:ClientSpec, conduit:GitToP4Pump) =>

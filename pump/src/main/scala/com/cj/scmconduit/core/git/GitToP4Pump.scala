@@ -23,6 +23,7 @@ import com.cj.scmconduit.core.RichFile._
 import com.cj.scmconduit.core.PumpState
 import com.cj.scmconduit.core.ScmPump
 import javax.xml.bind.annotation.XmlRootElement
+import java.util.regex.Pattern
 
 object GitToP4Pump {
   
@@ -344,8 +345,16 @@ class GitToP4Pump(private val conduitPath:File, private val shell:CommandRunner,
 				
 				try {
 					val changeListNum = new Git2P4Translator(myp4).translate(changes); 
-					myp4.doCommand("submit", "-c", changeListNum.toString());		
-					git.run("tag", "cl" + changeListNum.toString())
+					val result = myp4.doCommand("submit", "-c", changeListNum.toString());
+					
+					val lastLine= result.lines.toList.last
+					val Pattern = """.* renamed change (.*) and submitted.*""".r
+					val actualChangeListNum = lastLine match {
+					  case Pattern(foo)=>println("FINAL CL WAS " + foo)
+					  case _=> changeListNum.toString()
+					}
+					
+					git.run("tag", "cl" + actualChangeListNum.toString())
 				}catch{
 				  case e:Throwable=> {
 					  git.run("reset", "--hard", currentRev)
