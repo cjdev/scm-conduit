@@ -1,11 +1,15 @@
 package com.cj.scmconduit.server.ui;
 
+import org.apache.commons.io.IOUtils;
 import org.httpobjects.HttpObject;
 import org.httpobjects.Request;
 import org.httpobjects.Response;
 import org.httpobjects.header.response.LocationField;
 
 import com.cj.scmconduit.server.api.ConduitType;
+
+import java.io.*;
+import java.nio.ByteBuffer;
 
 public class AddConduitResource extends HttpObject {
 	public interface Listener {
@@ -20,19 +24,7 @@ public class AddConduitResource extends HttpObject {
 
 	@Override
 	public Response get(Request req) {
-		return OK(Html(
-				"<html><body>" +
-				"	<form action=\"/admin\" method=\"post\" >" +
-				"		<div>Name: <input type=\"text\" name=\"name\"/></div>" +
-				"		<div>Perforce Path: <input type=\"text\" name=\"p4path\"/></div>" +
-				"		<div>Fetch History Since: <input type=\"text\" name=\"p4FirstCL\"/ value=\"0\"></div>" +
-				"		<div>Conduit Type: <select name=\"type\">" +
-				"			<option>" + ConduitType.GIT + "</option>" + 
-				"			<option>" + ConduitType.BZR + "</option>" + 
-				"		</div>" +
-				"		<input type=\"submit\" value=\"Add\">" +
-				"	</form>" +
-				"</body></html>"));
+        return OK(FromClasspath("text/html", "/com/cj/scmconduit/server/admin.html", this.getClass()));
 	}
 	
 	@Override

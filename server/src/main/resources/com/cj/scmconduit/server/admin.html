@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script type="text/javascript" src="http://code.jquery.com/jquery-1.7.2.min.js"></script>
+    <title>Create Conduit</title>
+    <style type="text/css">
+        .errors-panel {
+            background-color: #b22222;
+            color: #f8f8ff;
+        }
+    </style>
+</head>
+<body>
+    <form action="/admin" method="post" >
+        <div>Name: <input type="text" name="name"/></div>
+        <div>Perforce Path: <input type="text" name="p4path"/></div>
+        <div>Fetch History Since: <input type="text" name="p4FirstCL" value="0"></div>
+        <div>Conduit Type: <select name="type">
+            <option>GIT</option>
+            <option>BZR</option>
+            </select>
+	    </div>
+        <input type="submit" value="Add">
+	</form>
+    <div class="errors"></div>
+</body>
+<script>
+    $(function(){
+        var nameElem = $("input[name=name]"),
+            pathElem = $("input[name=p4path]"),
+            errorsDiv = $(".errors");
+
+        function applyErrors(errors){
+           var ul = $("<ul></ul>");
+
+            $.each(errors, function(index, error){
+                ul.append($("<li>"+error+"</li>"));
+            });
+
+            ul.appendTo(errorsDiv);
+            errorsDiv.addClass("errors-panel");
+        }
+
+        function resetErrorsDiv(){
+            errorsDiv.empty();
+            errorsDiv.removeClass("errors-panel");
+        }
+
+        $("input[type=submit]").click(function(){
+            var name = $.trim(nameElem.val()),
+                path = $.trim(pathElem.val()),
+                errors = [],
+                endsWith = function(str, suffix){
+                    return str.indexOf(suffix, str.length - suffix.length) !== -1;
+                };
+
+            resetErrorsDiv();
+
+            if (name.length == 0){
+                errors.push("Conduit needs a name");
+            }
+
+            if (path.length == 0){
+                errors.push("Please specify a path");
+            }
+
+            if (endsWith(path, "...") || endsWith(path, "/")){
+                errors.push("Path cannot end with trailing ... or trailing /");
+            }
+
+            if (errors.length > 0){
+                applyErrors(errors);
+                return false;
+            }
+        });
+    });
+</script>
+</html>
