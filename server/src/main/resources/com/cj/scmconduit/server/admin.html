@@ -52,6 +52,9 @@
                 errors = [],
                 endsWith = function(str, suffix){
                     return str.indexOf(suffix, str.length - suffix.length) !== -1;
+                },
+                beginsWith = function(str, suffix){
+                    return str.indexOf(suffix) == 0;
                 };
 
             resetErrorsDiv();
@@ -62,6 +65,10 @@
 
             if (path.length == 0){
                 errors.push("Please specify a path");
+            }
+
+            if (path.length > 0 && !beginsWith(path, "//")){
+                errors.push("Path must start with //");
             }
 
             if (endsWith(path, "...") || endsWith(path, "/")){
