@@ -134,15 +134,26 @@ public class ConduitOrchestrator implements Pusher {
 	public synchronized CodeSubmissionSession newSession(P4Credentials creds){
 		final Integer id = findAvailableId();
 		out.println("id: " + id);
-		
-		CodeSubmissionSession session = new CodeSubmissionSession(name, id, publicUri, pathOnDisk, temps.newTempDir(), prepStrategy, shell, creds, this);
+
+        File somethingThatShouldBeDeletedEventually = temps.newTempDir();
+        CodeSubmissionSession session = new CodeSubmissionSession(name, id, publicUri, pathOnDisk, somethingThatShouldBeDeletedEventually, prepStrategy, shell, creds, this);
 		pushes.put(session.id(), session);
 		return session;
 	}
+    
+    public synchronized void endSession(final CodeSubmissionSession removeMe) {
+        pushes.get(removeMe.id()).trash();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                temps.dispose(removeMe.onDisk);
+            }
+        }).start();
+    }
 	
 	private Integer findAvailableId() {
 		Integer id = null;
-		while(id==null || pushes.get(id)!=null){
+		while(id==null || (pushes.get(id)!=null && !pushes.get(id).isDone())){
 			id = new Random().nextInt(65000-1000) + 1000;
 		}
 		return id;
@@ -151,8 +162,12 @@ public class ConduitOrchestrator implements Pusher {
 	public Map<Integer, CodeSubmissionSession> sessions() {
         return Collections.unmodifiableMap(pushes);
     }
-	
-	private interface ConduitOperation {
+
+    CodeSubmissionSession getSessionWithId(Integer sessionId) {
+        return pushes.get(sessionId);
+    }
+
+    private interface ConduitOperation {
 	    void exec(ScmPump scmPump, PrintStream out);
 	}
 	

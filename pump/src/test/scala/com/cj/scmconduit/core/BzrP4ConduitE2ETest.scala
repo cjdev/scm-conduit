@@ -12,7 +12,10 @@ import org.junit.Assert._
 import com.cj.scmconduit.core.bzr.BzrToP4Pump
 
 class BzrToP4PumpE2ETest {
-  
+  /**
+   * You need to run the following to get this to work. ( https://answers.launchpad.net/bzr-xmloutput/+question/66129 )
+   * bzr branch lp:bzr-xmloutput ~/.bazaar/plugins/xmloutput
+   */
 	def runE2eTest(test:(CommandRunner, ClientSpec, BzrToP4Pump)=>Unit){
 		val path = tempDir()
 		

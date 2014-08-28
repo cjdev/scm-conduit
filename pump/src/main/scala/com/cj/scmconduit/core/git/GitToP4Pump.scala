@@ -141,8 +141,9 @@ class GitToP4Pump(private val conduitPath:File, private val shell:CommandRunner,
       git.run("reset", "--hard", "cl" + cl)
       
       deleteChangelistTagsLargetThan(cl)
-      
-      p4.syncTo(P4RevSpec.forChangelist(cl), true)
+
+      val force: Boolean = true
+      p4.syncTo(P4RevSpec.forChangelist(cl), force)
       git.run("add", "--all")
       git.run("commit", "-m", "force sync")
       

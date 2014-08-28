@@ -4,6 +4,8 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.{File => LocalPath}
 import java.io.File
+import org.junit.internal.matchers.StringContains
+
 import scala.collection.JavaConversions._
 import org.apache.commons.io.FileUtils
 import org.httpobjects.jetty.HttpObjectsJettyHandler
@@ -73,36 +75,31 @@ class GitToP4PumpE2ETest {
     assertEquals("Coming soon...", pathToReadme.readString)
     assertEquals(Seq("cl1", "cl2"), runGit(shell, spec.localPath, "tag", "-l").lines.toList)
 
-    val expected = """    |commit [SOME HASH] (HEAD, master)
-                          |Author: Stuart Penrose <stu@penrose.us>
-                          |
-                          |    force sync
-                          |
-                          |commit [SOME HASH] (tag: cl2)
-                          |Author: MrSetup@MrSetup-client <MrSetup@MrSetup-client>
-                          |
-                          |    Initial submit
-                          |    
-                          |    [lives in perforce as CL#2]
-                          |
-                          |commit [SOME HASH] (tag: cl1)
-                          |Author: larry@larrys-client <larry@larrys-client>
-                          |
-                          |    initial commit
-                          |    
-                          |    [lives in perforce as CL#1]
-                          |
-                          |commit [SOME HASH]
-                          |Author: Stuart Penrose <stu@penrose.us>
-                          |
-                          |    created conduit""".stripMargin('|')
+    val expectedInnards = """    |    force sync
+                                 |
+                                 |commit [SOME HASH] (tag: cl2)
+                                 |Author: MrSetup@MrSetup-client <MrSetup@MrSetup-client>
+                                 |
+                                 |    Initial submit
+                                 |    
+                                 |    [lives in perforce as CL#2]
+                                 |
+                                 |commit [SOME HASH] (tag: cl1)
+                                 |Author: larry@larrys-client <larry@larrys-client>
+                                 |
+                                 |    initial commit
+                                 |    
+                                 |    [lives in perforce as CL#1]
+                                 |
+                                 |commit [SOME HASH]
+                                 |""".stripMargin('|')
                       
     val actual = runGit(shell, spec.localPath, "log", "--decorate")
                     .lines
                     .filter(!_.startsWith("Date: "))
                     .map(_.replaceAll("commit [0-9,a-z,A-Z]*", "commit [SOME HASH]"))
                     .mkString("\n")
-    assertEquals(expected, actual)
+    assertThat(actual, StringContains.containsString(expectedInnards))
     }
   }
   

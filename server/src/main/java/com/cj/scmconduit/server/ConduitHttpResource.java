@@ -25,7 +25,7 @@ public class ConduitHttpResource extends HttpObject {
 		final String remainder = req.pathVars().valueFor("remainder");
 		final Integer sessionId = parseSessionId(remainder);
 		if(sessionId==null) return NOT_FOUND();
-		final CodeSubmissionSession session = orchestrator.sessions().get(sessionId);
+		final CodeSubmissionSession session = orchestrator.getSessionWithId(sessionId);
 		
 		final Response r;
 		
@@ -43,6 +43,7 @@ public class ConduitHttpResource extends HttpObject {
 				}else{
 					r = OK(Text("OK:" + session.explanation()));
 				}
+                session.trash();
 			}else{
 				r = INTERNAL_SERVER_ERROR(Text("Unknown state: " + state));
 			}
