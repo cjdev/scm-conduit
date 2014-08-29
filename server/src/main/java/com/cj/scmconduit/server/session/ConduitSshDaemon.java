@@ -90,8 +90,8 @@ public class ConduitSshDaemon {
                                key + 
                               "#######################################\n");
                     log.debug(key.getClass());
-                    
-                    RSAPublicKey rsaKey = cast(key);
+
+                    RSAPublicKey rsaKey = (RSAPublicKey) key;
                     
                     String actual = new String(Base64.encodeBase64(rfc4253Encode(rsaKey)));
                     String keyOnFile = sshKeys.get(username);
@@ -133,11 +133,6 @@ public class ConduitSshDaemon {
     }
 
 
-    @SuppressWarnings("unchecked")
-    private static <O, T extends O> T cast(O object){
-        return (T) object;
-    }
-    
     private void setCredentials(final SessionHandler handler, ServerSession session, P4Credentials credentials) {
         session.setAttribute(CREDENTIALS_KEY, credentials);
         CodeSubmissionSession push = handler.prepareSessionFor(credentials, session);

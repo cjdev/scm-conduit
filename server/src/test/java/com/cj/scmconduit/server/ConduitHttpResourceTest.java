@@ -1,8 +1,6 @@
 package com.cj.scmconduit.server;
 
 import com.cj.scmconduit.server.session.CodeSubmissionSession;
-import org.hamcrest.Matcher;
-import org.httpobjects.Representation;
 import org.httpobjects.Request;
 import org.httpobjects.Response;
 import org.httpobjects.path.PathParam;
@@ -15,8 +13,6 @@ import org.mockito.Mockito;
 
 import java.io.ByteArrayOutputStream;
 
-import static org.httpobjects.DSL.OK;
-import static org.httpobjects.DSL.Text;
 import static org.mockito.Mockito.times;
 
 public class ConduitHttpResourceTest {
@@ -31,7 +27,7 @@ public class ConduitHttpResourceTest {
 
         ConduitHttpResource conduitHttpResource = new ConduitHttpResource("whatever", conduitOrchestrator);
 
-        Request req = new MockRequest(conduitHttpResource, "asdf") {
+        Request req = new MockRequest(conduitHttpResource, "whatever") {
             @Override
             public PathVariables pathVars() {
                 return new PathVariables(new PathParam(new PathParamName("remainder"), "11"));
@@ -97,7 +93,6 @@ public class ConduitHttpResourceTest {
     private String responseAsString(Response response) {
         ByteArrayOutputStream boos = new ByteArrayOutputStream();
         response.representation().write(boos);
-        String responseString = new String(boos.toByteArray());
-        return responseString;
+        return new String(boos.toByteArray());
     }
 }

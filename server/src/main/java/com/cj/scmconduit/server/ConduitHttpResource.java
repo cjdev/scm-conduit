@@ -65,8 +65,7 @@ public class ConduitHttpResource extends HttpObject {
             String[] parts = path.split(Pattern.quote("/"));
             String p = parts[parts.length - 1];
 
-            final Integer sessionId = Integer.parseInt(p.replaceAll(Pattern.quote(".scm-conduit-push-session-"), ""));
-            return sessionId;
+            return Integer.parseInt(p.replaceAll(Pattern.quote(".scm-conduit-push-session-"), ""));
         } catch (NumberFormatException e) {
             return null;
         }
