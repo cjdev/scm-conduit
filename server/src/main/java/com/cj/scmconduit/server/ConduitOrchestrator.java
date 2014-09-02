@@ -15,8 +15,10 @@ import com.cj.scmconduit.server.session.ConduitSshDaemon;
 import com.cj.scmconduit.server.session.ConduitState;
 import com.cj.scmconduit.server.session.GitSessionPrepStrategy;
 import com.cj.scmconduit.server.session.Pusher;
+import com.cj.scmconduit.server.session.SessionDisposalStrategy;
 import com.cj.scmconduit.server.session.SessionPrepStrategy;
 import com.cj.scmconduit.server.ssh.ShellCommand;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.sshd.common.Session;
@@ -53,7 +55,7 @@ public class ConduitOrchestrator implements Pusher {
     private ConduitState state = ConduitState.IDLE;
     private String error;
 
-    public ConduitOrchestrator(String name, PrintStream out, URI publicUri, final Integer sshPort, final File pathOnDisk, TempDirAllocator temps, final Database database) {
+    public ConduitOrchestrator(String name, PrintStream out, URI publicUri, final Integer sshPort, final File pathOnDisk, final TempDirAllocator temps, final Database database) {
         super();
         this.name = name;
         this.out = out;
@@ -87,12 +89,11 @@ public class ConduitOrchestrator implements Pusher {
 
 
         final Runnable doNothing = new Runnable() {
-            public void run() {
-            }
-
-            ;
+            public void run() {}
         };
 
+        new ConduitCleanupThread().start();
+        
         new ConduitSshDaemon(
                 sshPort,
                 sshSessionHandler,
@@ -139,21 +140,13 @@ public class ConduitOrchestrator implements Pusher {
         out.println("id: " + id);
 
         File somethingThatShouldBeDeletedEventually = temps.newTempDir();
+        
         CodeSubmissionSession session = new CodeSubmissionSession(name, id, publicUri, pathOnDisk, somethingThatShouldBeDeletedEventually, prepStrategy, shell, creds, this);
         pushes.put(session.id(), session);
         return session;
     }
-
-    public synchronized void endSession(final CodeSubmissionSession removeMe) {
-        pushes.get(removeMe.id()).trash();
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                temps.dispose(removeMe.onDisk);
-            }
-        }).start();
-    }
-
+    
+    
     private static final int MAX_PRIVATE_PUSH_ID = 65000;
     private static final int MIN_PRIVATE_PUSH_ID = 1000;
 
@@ -321,4 +314,44 @@ public class ConduitOrchestrator implements Pusher {
         }
     }
 
+    class ConduitCleanupThread extends Thread {
+        final Log log = LogFactory.getLog(getClass());
+        @Override
+        public void run() {
+            while(true){
+                
+                final List<CodeSubmissionSession> finishedSessions = findFinishedSessions();
+                final long sleeptime = 60000;
+                log.info("Found " + finishedSessions.size() + " finished sessions.  I'll wait for " + (sleeptime/1000) + " seconds, then clean them up.");
+                sleepQuietly(sleeptime); // let sessions sit around for while so that people have a chance to get the final status
+                log.info("OK, time to start cleaning up those " + finishedSessions.size() + " sessions.");
+                for(CodeSubmissionSession session: finishedSessions){
+                    log.info("Removing session " + session.id() + " at " + session.onDisk);
+                    pushes.remove(session.id());
+                    temps.dispose(session.onDisk);
+                    log.info("Done removing session " + session.id());
+                }
+                
+            }
+        }
+
+        private List<CodeSubmissionSession> findFinishedSessions() {
+            List<CodeSubmissionSession> finishedSessions = new ArrayList<CodeSubmissionSession>();
+            for(CodeSubmissionSession session: pushes.values()){
+                if(session.state() == CodeSubmissionSession.State.FINISHED){
+                    finishedSessions.add(session);
+                }
+            }
+            return finishedSessions;
+        }
+
+        private void sleepQuietly(long millis) {
+            try {
+                Thread.sleep(millis);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+    
 }

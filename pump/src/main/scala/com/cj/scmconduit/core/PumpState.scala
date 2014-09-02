@@ -7,8 +7,8 @@ import javax.xml.bind.annotation.XmlAccessType
 import javax.xml.bind.annotation.XmlAccessorType
 import javax.xml.bind.annotation.XmlElement
 import javax.xml.bind.annotation.XmlRootElement
-import scala.reflect.BeanProperty
-import scala.annotation.target.beanGetter
+import scala.beans.BeanProperty
+import scala.annotation.meta.beanGetter
 
 object PumpState {
   def read(path:File) = jaxb().createUnmarshaller().unmarshal(path).asInstanceOf[PumpState]

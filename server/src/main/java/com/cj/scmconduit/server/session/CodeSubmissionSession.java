@@ -10,7 +10,7 @@ import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.util.CommandRunner;
 
 public class CodeSubmissionSession {
-    public enum State {WAITING_FOR_INPUT, WORKING, FINISHED, TRASHY}
+    public enum State {WAITING_FOR_INPUT, WORKING, FINISHED}
 	
 	private CodeSubmissionSession.State state = State.WAITING_FOR_INPUT;
 
@@ -24,13 +24,9 @@ public class CodeSubmissionSession {
 	private boolean hadErrors = false;
 	private String explanation;
 	private final Pusher pusher;
-
-    public void trash() {
-        state = State.TRASHY;
-    }
-
+	
     public boolean isDone() {
-        return state == State.TRASHY;
+        return state == State.FINISHED;
     }
 
     public CodeSubmissionSession(String conduitName, Integer id, URI publicUri, File conduitLocation, File onDisk, SessionPrepStrategy strategy, CommandRunner shell, final P4Credentials credentials, final Pusher pusher) {

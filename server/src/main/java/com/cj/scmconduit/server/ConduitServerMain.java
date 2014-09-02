@@ -41,6 +41,7 @@ import org.mortbay.jetty.handler.ResourceHandler;
 
 import scala.Function1;
 import scala.Tuple2;
+import scala.collection.mutable.ListBuffer;
 import scala.runtime.AbstractFunction1;
 import scala.runtime.BoxedUnit;
 
@@ -422,16 +423,17 @@ public class ConduitServerMain {
 
                 String serverLocation = p4Path + "/...";
                 String clientLocation = "/...";
-                scala.collection.immutable.List<Tuple2<String, String>> view = scala.collection.immutable.List.<Tuple2<String,String>>fromArray(new Tuple2[]{
-                        new Tuple2<String, String>(serverLocation, clientLocation)
-                });
-
+                
+                ListBuffer<Tuple2<String, String>> lb = new ListBuffer<Tuple2<String, String>>();
+                
+                lb.$plus$eq(new Tuple2<String, String>(serverLocation, clientLocation));
+                
                 ClientSpec spec = new ClientSpec(
                         localPath,
                         config.p4User,
                         clientId,
                         config.publicHostname,
-                        view);
+                        lb.toList());
 
                 P4Credentials credentials = new P4Credentials(config.p4User, "");
 
