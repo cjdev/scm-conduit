@@ -145,11 +145,11 @@ public class ConduitOrchestrator implements Pusher {
     }
 
     public synchronized void endSession(final CodeSubmissionSession removeMe) {
-        removeMe.trash();
+        pushes.get(removeMe.id()).trash();
         new Thread(new Runnable() {
             @Override
             public void run() {
-                temps.dispose(removeMe.localPath());
+                temps.dispose(removeMe.onDisk);
             }
         }).start();
     }

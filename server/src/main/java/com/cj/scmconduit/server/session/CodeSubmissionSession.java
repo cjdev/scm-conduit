@@ -18,7 +18,7 @@ public class CodeSubmissionSession {
 	private final Integer pushId;
 	private final P4Credentials credentials;
 	
-	private final File onDisk;
+	public final File onDisk;
 	private final String conduitName;
 	
 	private boolean hadErrors = false;
