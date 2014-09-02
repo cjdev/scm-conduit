@@ -39,14 +39,11 @@ public class ConduitHttpResource extends HttpObject {
                 r = OK(Text("WORKING"));
             } else if (state == CodeSubmissionSession.State.WORKING) {
                 r = OK(Text("WORKING"));
-            } else if (state == CodeSubmissionSession.State.FINISHED || state == State.TRASHY) {
+            } else if (state == CodeSubmissionSession.State.FINISHED) {
                 if (session.hadErrors()) {
                     r = OK(Text("ERROR:" + session.explanation()));
                 } else {
                     r = OK(Text("OK:" + session.explanation()));
-                }
-                if (state != State.TRASHY) {
-                    session.trash();
                 }
             } else {
                 r = INTERNAL_SERVER_ERROR(Text("Unknown state: " + state));

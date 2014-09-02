@@ -9,7 +9,7 @@
 	<name>${project.artifactId}</name>
 
 	<properties>
-		<scala-version>2.10.0</scala-version>
+		<scala-version>2.11.1</scala-version>
 	</properties>
 
 	<build>

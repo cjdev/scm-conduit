@@ -15,7 +15,7 @@ class P42GitTranslatorTest {
     // GIVEN
     val where = tempPath("sallysP4")
     val testSubject = new P42GitTranslator(where);
-    val cl = new P4Changelist(23, "bought a dog", "sally", new P4Time(2012, 04, 24, 11, 32, 323))
+    val cl = new P4Changelist(23, "bought a dog", "sally", new P4Time(2012, 4, 24, 11, 32, 323))
     val changes = List[Change](
     		new Change(ChangeType.ADD, "fido.dog", where/"fido.dog" getAbsolutePath, 0)
     )
@@ -34,7 +34,7 @@ class P42GitTranslatorTest {
     // GIVEN
     val where = tempPath("sallysP4")
     val testSubject = new P42GitTranslator(where);
-    val cl = new P4Changelist(23, "ate the dog", "sally", new P4Time(2012, 04, 24, 11, 32, 323))
+    val cl = new P4Changelist(23, "ate the dog", "sally", new P4Time(2012, 4, 24, 11, 32, 323))
     val changes = List[Change](
     		new Change(ChangeType.DELETE, "dog.txt", where/"dog.txt" getAbsolutePath, 0)
     )
@@ -53,7 +53,7 @@ class P42GitTranslatorTest {
     // GIVEN
     val where = tempPath("sallysP4")
     val testSubject = new P42GitTranslator(where);
-    val cl = new P4Changelist(23, "surgically implanted a nuclear power source in the dog", "sally", new P4Time(2012, 04, 24, 11, 32, 323))
+    val cl = new P4Changelist(23, "surgically implanted a nuclear power source in the dog", "sally", new P4Time(2012, 4, 24, 11, 32, 323))
     val changes = List[Change](
     		new Change(ChangeType.UPDATE, "dog.txt", where/"dog.txt" getAbsolutePath, 0)
     )
