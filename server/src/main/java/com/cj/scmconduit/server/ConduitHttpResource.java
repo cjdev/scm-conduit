@@ -46,7 +46,7 @@ public class ConduitHttpResource extends HttpObject {
                     r = OK(Text("OK:" + session.explanation()));
                 }
                 if (state != State.TRASHY) {
-                    session.trash();
+                    orchestrator.endSession(session);
                 }
             } else {
                 r = INTERNAL_SERVER_ERROR(Text("Unknown state: " + state));

@@ -18,7 +18,7 @@ import static org.mockito.Mockito.times;
 public class ConduitHttpResourceTest {
 
     @Test
-    public void trashesSessionWhenFinished() {
+    public void endsSessionWhenFinished() {
         //given
         ConduitOrchestrator conduitOrchestrator = Mockito.mock(ConduitOrchestrator.class);
         CodeSubmissionSession codeSubmissionSession = Mockito.mock(CodeSubmissionSession.class);
@@ -38,7 +38,7 @@ public class ConduitHttpResourceTest {
         conduitHttpResource.get(req);
 
         //then
-        Mockito.verify(codeSubmissionSession, times(1)).trash();
+        Mockito.verify(conduitOrchestrator, times(1)).endSession(codeSubmissionSession);
     }
     @Test
     public void doesNotTrashSessionWhenAlreadyTrashed() {
