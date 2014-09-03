@@ -37,7 +37,7 @@ public class CodeSubmissionSession {
 		this.credentials = credentials;
 		this.pusher = pusher;
 		
-		log.info("session " + id + " started at " + conduitLocation.getAbsolutePath());
+		log.info("session " + id + " started at " + onDisk.getAbsolutePath());
 		
 		strategy.prepareDestinationDirectory(id, publicUri, conduitLocation, codePath(), shell);
 	}
