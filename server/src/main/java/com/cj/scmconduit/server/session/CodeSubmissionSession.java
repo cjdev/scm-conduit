@@ -62,7 +62,7 @@ public class CodeSubmissionSession {
 		state = State.FINISHED;
 		this.hadErrors = hasErrors;
 		this.explanation = explanation;
-		log.debug(getClass().getSimpleName() + " is finished: " + state + "  " + explanation);
+		log.info("finished " + state + "  " + explanation);
 	}
 	
 	public void inputReceived(){
