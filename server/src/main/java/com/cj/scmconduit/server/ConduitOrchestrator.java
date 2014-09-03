@@ -316,7 +316,7 @@ public class ConduitOrchestrator implements Pusher {
     }
 
     class ConduitCleanupThread extends Thread {
-        final Log log = LogFactory.getLog(getClass());
+        final Log log = LogFactory.getLog(getClass() + "." + name);
         @Override
         public void run() {
             while(true){
