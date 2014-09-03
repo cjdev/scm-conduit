@@ -39,7 +39,6 @@ import java.util.Random;
 
 public class ConduitOrchestrator implements Pusher {
     public static final int FIVE_SECONDS = 5000;
-    private final Log log = LogFactory.getLog(getClass());
     private final PrintStream out;
     private final URI publicUri;
     private final File pathOnDisk;
@@ -50,6 +49,7 @@ public class ConduitOrchestrator implements Pusher {
     private final Map<Integer, CodeSubmissionSession> pushes = new HashMap<Integer, CodeSubmissionSession>();
     private final TempDirAllocator temps;
     private final ConduitType type;
+    private final Log log;
     private final String name;
 
     private ConduitState state = ConduitState.IDLE;
@@ -63,7 +63,8 @@ public class ConduitOrchestrator implements Pusher {
         this.publicUri = publicUri;
         this.pathOnDisk = pathOnDisk;
         this.temps = temps;
-
+        this.log = LogFactory.getLog(getClass().getName() + "." + name);
+        
         if (new File(pathOnDisk, ".bzr").exists()) {
             type = ConduitType.BZR;
             prepStrategy = new BzrSessionPrepStrategy();

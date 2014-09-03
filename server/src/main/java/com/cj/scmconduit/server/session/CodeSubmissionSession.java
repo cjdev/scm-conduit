@@ -14,7 +14,7 @@ public class CodeSubmissionSession {
 	
 	private CodeSubmissionSession.State state = State.WAITING_FOR_INPUT;
 
-	private final Log log = LogFactory.getLog(getClass());
+	private final Log log;
 	private final Integer pushId;
 	private final P4Credentials credentials;
 	
@@ -30,11 +30,15 @@ public class CodeSubmissionSession {
     }
 
     public CodeSubmissionSession(String conduitName, Integer id, URI publicUri, File conduitLocation, File onDisk, SessionPrepStrategy strategy, CommandRunner shell, final P4Credentials credentials, final Pusher pusher) {
+        this.log = LogFactory.getLog(getClass() + "." + conduitName + "." + id);
 	    this.conduitName = conduitName;
 		this.pushId = id;
 		this.onDisk = onDisk;
 		this.credentials = credentials;
 		this.pusher = pusher;
+		
+		log.info("session " + id + " started at " + conduitLocation.getAbsolutePath());
+		
 		strategy.prepareDestinationDirectory(id, publicUri, conduitLocation, codePath(), shell);
 	}
 	
