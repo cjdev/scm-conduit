@@ -60,10 +60,11 @@ object GitToP4Pump {
 			val conduit = new GitToP4Pump(spec.localPath, shell, out)
 			observer(conduit);
 			
-//			conduit.initialSync(p4FirstCL.toLong);
-			
-			createDummyInitialP4Commit(spec.localPath, p4, conduit)
-			    
+			if(p4FirstCL > 0){
+			  conduit.initialSync(p4FirstCL.toLong);
+			}else{
+			  createDummyInitialP4Commit(spec.localPath, p4, conduit)
+			}
 	}
 	
 }
