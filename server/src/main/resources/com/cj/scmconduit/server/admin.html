@@ -13,7 +13,7 @@
 <body>
     <form action="/admin" method="post" >
         <div>Name: <input type="text" name="name"/></div>
-        <div>Perforce Path: <input type="text" name="p4path"/></div>
+        <div>Perforce Path(s): <textarea name="p4path"></textarea></div>
         <div>Fetch History Since: <input type="text" name="p4FirstCL" value="0"></div>
         <div>Conduit Type: <select name="type">
             <option>GIT</option>
@@ -27,7 +27,7 @@
 <script>
     $(function(){
         var nameElem = $("input[name=name]"),
-            pathElem = $("input[name=p4path]"),
+            pathElem = $("textarea[name=p4path]"),
             errorsDiv = $(".errors");
 
         function applyErrors(errors){

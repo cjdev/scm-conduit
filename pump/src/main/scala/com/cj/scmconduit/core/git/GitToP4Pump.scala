@@ -59,6 +59,9 @@ object GitToP4Pump {
 			    
 			val conduit = new GitToP4Pump(spec.localPath, shell, out)
 			observer(conduit);
+			
+//			conduit.initialSync(p4FirstCL.toLong);
+			
 			createDummyInitialP4Commit(spec.localPath, p4, conduit)
 			    
 	}
@@ -66,7 +69,6 @@ object GitToP4Pump {
 }
 
 class GitToP4Pump(private val conduitPath:File, private val shell:CommandRunner, private val out:PrintStream) extends ScmPump {
-//	private static final String TEMP_FILE_NAME=".scm-conduit-temp";
 	private val META_FILE_NAME=".scm-conduit";
 
 	private val p4:P4 = {
@@ -149,6 +151,51 @@ class GitToP4Pump(private val conduitPath:File, private val shell:CommandRunner,
       
 	}
 	
+	
+    def initialSync(initialRevision:Long) {
+        assertNoPendingChangelists();
+        val p4TimeZoneOffset = findP4TimeZoneOffset();
+        
+        val p4LatestBranchName = "p4-incoming"
+          
+        deleteBranchIfExists(p4LatestBranchName)
+        
+        git.run("branch", p4LatestBranchName, "HEAD")
+        git.run("checkout", p4LatestBranchName)
+        
+        assertNoGitChanges();
+        val nextChange = p4.changesBetween(P4RevRangeSpec.between(P4RevSpec.forChangelist(initialRevision), P4RevSpec.forChangelist(initialRevision))).get(0);
+            
+            
+        val changes = p4.syncTo(P4RevSpec.forChangelist(nextChange.id()));
+        
+        val status = new GitStatus(git.run("status", "-s"))
+        
+        val filesICareAbout = status.files.filter{change=>change.file != ".scm-conduit"}
+        
+        if (filesICareAbout.size > 0){
+            
+            val gitCommands = new P42GitTranslator(conduitPath).translate(nextChange, changes, p4TimeZoneOffset);
+            gitCommands.foreach{command=>
+                git.run(command:_*);
+            }
+            
+        }
+        
+        git.run("tag", "cl" + nextChange.id());
+                    
+                
+        assertNoGitChanges();
+        recordLastSuccessfulSync(nextChange.id());
+
+        git.run("checkout", "master")
+        git.run("rebase", p4LatestBranchName)
+        
+        git.run("branch", "-d", p4LatestBranchName)
+        git.run("update-server-info")
+        git.run("reflog", "expire", "--expire=30", "--all")
+    }
+	
 	override def pullChangesFromPerforce() {
         assertNoPendingChangelists();
 		val p4TimeZoneOffset = findP4TimeZoneOffset();
@@ -168,10 +215,10 @@ class GitToP4Pump(private val conduitPath:File, private val shell:CommandRunner,
 		git.run("branch", p4LatestBranchName, branchPoint)
 		git.run("checkout", p4LatestBranchName)
 		
+        val newStuff = findDepotChangesSince(findLastSyncRevision());
+            
 		var keepPumping = true;
 		while(keepPumping){
-			val lastSync = findLastSyncRevision();
-			val newStuff = findDepotChangesSince(lastSync);
 			
 			backlogSize = newStuff.size()
 			
@@ -207,6 +254,7 @@ class GitToP4Pump(private val conduitPath:File, private val shell:CommandRunner,
 				
 				assertNoGitChanges();
 				recordLastSuccessfulSync(nextChange.id());
+				newStuff.remove(0)
 			}
 		}
 		
@@ -240,6 +288,7 @@ class GitToP4Pump(private val conduitPath:File, private val shell:CommandRunner,
 		var inViewSection = false;
 		IOUtils.readLines(new StringReader(clientSpec)).asInstanceOf[java.util.List[String]].foreach{line=>
 		  if(inViewSection){
+		    if(!path.isEmpty()) path += "\n"
 		    path += line.trim().split(" ")(0).trim()
 		  }else if(line.trim().startsWith("View:")){
 		    inViewSection = true
@@ -372,9 +421,10 @@ class GitToP4Pump(private val conduitPath:File, private val shell:CommandRunner,
 		}
 	}
   
-  private def gitHasTagForChangelist(nextChange: com.cj.scmconduit.core.p4.P4Changelist): Boolean = {
+  private def gitHasTagForChangelist(nextChange: com.cj.scmconduit.core.p4.P4Changelist): Boolean = gitHasTagForChangelist(nextChange.id)
+  private def gitHasTagForChangelist(nextChange: Long): Boolean = {
 	  val hasTag = try{
-	    val matches = git.run("show-ref", "--tags", "cl" + nextChange.id())
+	    val matches = git.run("show-ref", "--tags", "cl" + nextChange)
 	    matches.trim().length()>1
 	  }catch {
 	    case e:Exception=>false// show-ref can return -1, which causes the git class here to show an error

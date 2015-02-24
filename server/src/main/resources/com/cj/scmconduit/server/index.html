@@ -99,20 +99,24 @@ $(function(){
 				logoUrl = "";
 			}
 			
-			$("#whatever").append('<div class="conduitbox ' + additionalWidgetClasses + '">' + 
-			'<div class="conduitLabel">' + conduit.name + 
-			'<img width="64" height="64" style="float:left;margin:5px;" src="' + logoUrl + '"/>' + 
-			'<span class="' + statusClasses + '" style="font-size:10pt;font-weight:normal;font-style:italic;"> [' + conduit.status + ']' + 
-			' <a href="' + conduit.logUrl + '">LOG</a> ' + 
-			'<a href="' + conduit.apiUrl + '">API</a>' + 
-			'<button class="deleteButton" id="' + buttonId + '">Delete</button>' + 
-			'</div>' + 
-			'<table>' + 
-			'	<tr><td class="label">Perforce:</td><td>' + conduit.p4path + '</td></tr>' + 
-			'	<tr><td class="label"></td><td><pre class="snippet">' + instructions + '</pre></td></tr>' + 
-// 			'	<tr><td class="label">Read/Write:</td><td>ssh://build115.wl.cj.com:3433/</td></tr>' + 
-			'</table>' + 
-			'</div>');
+			var progressMeter = conduit.status === "BUILDING" ? " - " + conduit.backlogSize + " REVISIONS TO GO": ""; 
+			
+			$("#whatever").append(
+			        '<div class="conduitbox ' + additionalWidgetClasses + '">' + 
+					'<div class="conduitLabel">' + conduit.name + 
+					'<img width="64" height="64" style="float:left;margin:5px;" src="' + logoUrl + '"/>' + 
+					'<span class="' + statusClasses + '" style="font-size:10pt;font-weight:normal;font-style:italic;"> [' + conduit.status + progressMeter + ']' + 
+					' <a href="' + conduit.logUrl + '">LOG</a> ' + 
+					'<a href="' + conduit.apiUrl + '">API</a>' + 
+					'<button class="deleteButton" id="' + buttonId + '">Delete</button>' + 
+					'</div>' + 
+					'<table>' + 
+					'	<tr><td class="label">Perforce:</td><td style="white-space: pre;">' + conduit.p4path + '</td></tr>' + 
+					'	<tr><td class="label"></td><td><pre class="snippet">' + instructions + '</pre></td></tr>' + 
+		// 			'	<tr><td class="label">Read/Write:</td><td>ssh://build115.wl.cj.com:3433/</td></tr>' + 
+					'</table>' + 
+					'</div>'
+			);
 			
 			$("#" + buttonId).click(function(){
 				var userSaidYes = confirm("delete " + conduit.name + "?");

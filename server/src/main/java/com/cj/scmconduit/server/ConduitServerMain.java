@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
@@ -41,6 +42,7 @@ import org.mortbay.jetty.handler.ResourceHandler;
 
 import scala.Function1;
 import scala.Tuple2;
+import scala.collection.Seq;
 import scala.collection.mutable.ListBuffer;
 import scala.runtime.AbstractFunction1;
 import scala.runtime.BoxedUnit;
@@ -49,6 +51,7 @@ import com.cj.scmconduit.core.ScmPump;
 import com.cj.scmconduit.core.bzr.BzrToP4Pump;
 import com.cj.scmconduit.core.git.GitToP4Pump;
 import com.cj.scmconduit.core.p4.ClientSpec;
+import com.cj.scmconduit.core.p4.P4ClientSpecServerPath;
 import com.cj.scmconduit.core.p4.P4Credentials;
 import com.cj.scmconduit.core.p4.P4DepotAddress;
 import com.cj.scmconduit.core.util.CommandRunner;
@@ -117,6 +120,11 @@ public class ConduitServerMain {
     private final String publicHostname;
     private final Database database;
 
+    
+    private static <A, B> Tuple2<A, B> tuple(A a, B b) {
+        return new Tuple2<A, B>(a, b);
+    }
+    
     public ConduitServerMain(final Config config) throws Exception {
         this.log = LogFactory.getLog(getClass());
         this.config = config;
@@ -167,11 +175,33 @@ public class ConduitServerMain {
         // Add shared bzr repository
         root.addVResource("/.bzr", new File(config.path, ".bzr"));
 
-
+        
+        
+        
         HttpObject addConduitPage = new AddConduitResource(new AddConduitResource.Listener() {
             @Override
-            public void addConduit(final ConduitType type, final String name, final String p4Path, final Integer p4FirstCL) {
-                ConduitCreationThread thread = new ConduitCreationThread(config, type, name, p4Path, p4FirstCL, root);
+            public void addConduit(final ConduitType type, final String name, final String p4Paths, final Integer p4FirstCL) {
+                final String[] excludePaths = p4Paths.split("\\r?\\n");
+                
+                
+
+                final List<Tuple2<String, String>> e = new ArrayList<Tuple2<String, String>>();
+                
+                for(int x=0;x<excludePaths.length;x++){
+                    final String line = excludePaths[x].trim();
+                    final boolean isExclude = line.startsWith("-");
+
+                    P4ClientSpecServerPath parsed =  P4ClientSpecServerPath.parse(line);
+                    
+                    final String serverSide = (isExclude?"-":"") + "//" + parsed.depotName + parsed.path + "/...";
+                    
+                    final String clientSide = parsed.path.isEmpty() ? "/..." : parsed.path + "/...";
+                    System.out.println(serverSide + " -> " + clientSide);
+                    e.add(tuple(serverSide, clientSide));
+                }
+                
+                
+                ConduitCreationThread thread = new ConduitCreationThread(config, type, name, p4FirstCL, root, e.toArray(new Tuple2[]{}));
                 creationThreads.add(thread);
                 thread.start();
             }
@@ -287,6 +317,8 @@ public class ConduitServerMain {
                     } else {
                         dto.status = ConduitState.BUILDING;
                         dto.backlogSize = next.pump.backlogSize();
+                        dto.p4path = next.pump.p4Path();
+                        dto.type = next.type;
                         dto.currentP4Changelist = next.pump.currentP4Changelist();
                     }
 
@@ -327,7 +359,6 @@ public class ConduitServerMain {
         jetty.start();
 
     }
-
 
     private static <T> T readJackson(Representation representation, Class<? extends T> clazz) {
         try {
@@ -390,18 +421,18 @@ public class ConduitServerMain {
         final Config config;
         final ConduitType type;
         final String name;
-        final String p4Path;
+        final Tuple2<String, String>[] mappings;
         final Integer p4FirstCL;
         final VFSResource root;
         ScmPump pump;
 
         private ConduitCreationThread(Config config, ConduitType type,
-                String name, String p4Path, Integer p4FirstCL, VFSResource root) {
+                String name, Integer p4FirstCL, VFSResource root, Tuple2<String, String> ... mappings) {
             super();
             this.config = config;
             this.type = type;
             this.name = name;
-            this.p4Path = p4Path;
+            this.mappings = mappings;
             this.p4FirstCL = p4FirstCL;
             this.root = root;
         }
@@ -421,12 +452,7 @@ public class ConduitServerMain {
 
                 String clientId = config.clientIdPrefix + name;
 
-                String serverLocation = p4Path + "/...";
-                String clientLocation = "/...";
-                
-                ListBuffer<Tuple2<String, String>> lb = new ListBuffer<Tuple2<String, String>>();
-                
-                lb.$plus$eq(new Tuple2<String, String>(serverLocation, clientLocation));
+                Seq<Tuple2<String, String>> lb = scala.collection.JavaConversions.asScalaBuffer(java.util.Arrays.asList(mappings));
                 
                 ClientSpec spec = new ClientSpec(
                         localPath,
